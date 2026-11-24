@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && node copy-to-docs.js",
+    "build": "tsc -b && vite build",
     "lint": "oxlint src",
     "preview": "vite preview"
   },
