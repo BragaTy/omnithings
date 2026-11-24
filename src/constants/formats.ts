@@ -10,7 +10,8 @@ export const ALL_FORMATS: Record<string, FormatOption> = {
   ico: { extension: 'ico', label: 'ICO', mimeType: 'image/x-icon', category: 'image', description: 'Ícone para sites (favicon) e apps' },
   svg: { extension: 'svg', label: 'SVG', mimeType: 'image/svg+xml', category: 'image', description: 'Gráfico vetorial escalável' },
   gif: { extension: 'gif', label: 'GIF', mimeType: 'image/gif', category: 'image', description: 'Imagem / animação leve' },
-  base64: { extension: 'txt', label: 'Base64 (URI)', mimeType: 'text/plain', category: 'other', description: 'Texto codificado em Base64 para código/web' },
+  // `extension` is the target id used by the converter; base64/hash produce .txt files
+  base64: { extension: 'base64', label: 'Base64 (URI)', mimeType: 'text/plain', category: 'other', description: 'Texto codificado em Base64 para código/web' },
 
   // Documents
   pdf: { extension: 'pdf', label: 'PDF', mimeType: 'application/pdf', category: 'document', description: 'Documento portátil legível em qualquer dispositivo' },
@@ -41,7 +42,7 @@ export const ALL_FORMATS: Record<string, FormatOption> = {
   zip: { extension: 'zip', label: 'ZIP', mimeType: 'application/zip', category: 'archive', description: 'Arquivo comprimido com múltiplos arquivos' },
   
   // Hash / Checksum
-  hash: { extension: 'txt', label: 'Checksum / Hash (SHA-256)', mimeType: 'text/plain', category: 'other', description: 'Verificação criptográfica de integridade' }
+  hash: { extension: 'hash', label: 'Checksum / Hash (SHA-256)', mimeType: 'text/plain', category: 'other', description: 'Verificação criptográfica de integridade' }
 };
 
 export function detectCategory(extension: string, mimeType?: string): FileCategory {
