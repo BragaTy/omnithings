@@ -173,7 +173,7 @@ export const PreviewModal: React.FC<PreviewModalProps> = ({ item, onClose }) => 
             <button
               type="button"
               onClick={() => item.resultBlob && downloadBlob(item.resultBlob, item.resultName || `${item.name}.${item.targetFormat}`)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white shadow-lg shadow-emerald-600/30 transition-all"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold text-white transition-all"
             >
               <Download className="w-3.5 h-3.5" />
               Baixar Convertido

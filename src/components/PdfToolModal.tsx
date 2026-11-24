@@ -419,7 +419,7 @@ export const PdfToolModal: React.FC<PdfToolModalProps> = ({ tool, onClose }) => 
             type="button"
             disabled={loading}
             onClick={handleExecute}
-            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-xs font-semibold text-white shadow-lg shadow-rose-600/30 transition-all"
+            className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-xs font-semibold text-white transition-all"
           >
             {loading ? (
               <>

@@ -87,7 +87,6 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
             {firstCategory === 'audio' && (
               <>
                 <option value="wav">WAV (Estúdio)</option>
-                <option value="mp3">MP3</option>
               </>
             )}
             <option value="zip">ZIP (Compactar)</option>
@@ -103,7 +102,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
             type="button"
             disabled={isConvertingAll}
             onClick={onConvertAll}
-            className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 active:scale-95 text-white font-semibold text-xs shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+            className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-semibold text-xs transition-all disabled:opacity-50"
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>{isConvertingAll ? 'Convertendo...' : 'Converter Todos'}</span>
@@ -114,7 +113,7 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
           <button
             type="button"
             onClick={onDownloadAllZip}
-            className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs shadow-lg shadow-emerald-600/30 transition-all"
+            className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-semibold text-xs transition-all"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Baixar Todos (.ZIP)</span>

@@ -41,16 +41,16 @@ export async function convertToBase64(
   file: File
 ): Promise<{ blob: Blob; filename: string }> {
   const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-  const buffer = await file.arrayBuffer();
-  const bytes = new Uint8Array(buffer);
-  
-  let binary = '';
-  const len = bytes.byteLength;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
+  // FileReader is native and handles large files without building a huge string byte by byte
+  let dataUri = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo para Base64.'));
+    reader.readAsDataURL(file);
+  });
+  if (!file.type) {
+    dataUri = dataUri.replace(/^data:[^;,]*/, 'data:application/octet-stream');
   }
-  const base64 = window.btoa(binary);
-  const dataUri = `data:${file.type || 'application/octet-stream'};base64,${base64}`;
 
   const blob = new Blob([dataUri], { type: 'text/plain;charset=utf-8' });
   return { blob, filename: `${baseName}_base64.txt` };

@@ -48,8 +48,14 @@ export function detectCategory(extension: string, mimeType?: string): FileCatego
   const ext = extension.toLowerCase().replace(/^\./, '');
   
   const imageExts = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'ico', 'svg', 'gif', 'tiff', 'tif', 'avif'];
-  const docExts = ['pdf', 'txt', 'md', 'markdown', 'html', 'htm', 'rtf', 'docx', 'doc'];
-  const dataExts = ['csv', 'tsv', 'json', 'xlsx', 'xls', 'xml', 'yaml', 'yml'];
+  const docExts = ['pdf', 'txt', 'md', 'markdown', 'html', 'htm', 'rtf', 'docx', 'doc', 'odt'];
+  const dataExts = ['csv', 'tsv', 'json', 'xlsx', 'xls', 'ods', 'xml', 'yaml', 'yml'];
+
+  // Check extensions first: MIME types reported by the OS are often wrong
+  // (e.g. .csv reported as "application/vnd.ms-excel", .ts as "video/mp2t")
+  if (imageExts.includes(ext)) return 'image';
+  if (dataExts.includes(ext)) return 'data';
+  if (docExts.includes(ext)) return 'document';
   const audioExts = ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac', 'weba', 'wma'];
   const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
 
@@ -86,7 +92,7 @@ export function getCompatibleTargets(ext: string, category: FileCategory): Forma
         candidates = ['xlsx', 'pdf', 'json', 'yaml', 'xml', 'html', 'txt'];
       } else if (cleanExt === 'json') {
         candidates = ['csv', 'xlsx', 'pdf', 'yaml', 'xml', 'txt'];
-      } else if (['xlsx', 'xls'].includes(cleanExt)) {
+      } else if (['xlsx', 'xls', 'ods'].includes(cleanExt)) {
         candidates = ['pdf', 'csv', 'json', 'html', 'txt', 'xml', 'yaml'];
       } else if (['yaml', 'yml'].includes(cleanExt)) {
         candidates = ['json', 'csv', 'xlsx', 'xml', 'txt'];
@@ -111,7 +117,7 @@ export function getCompatibleTargets(ext: string, category: FileCategory): Forma
       if (cleanExt === 'pdf') {
         candidates = ['docx', 'txt', 'md', 'html', 'png', 'jpg', 'xlsx'];
       } else if (['docx', 'doc', 'rtf', 'odt'].includes(cleanExt)) {
-        candidates = ['pdf', 'txt', 'md', 'html'];
+        candidates = ['pdf', 'docx', 'txt', 'md', 'html'];
       } else if (cleanExt === 'md' || cleanExt === 'markdown') {
         candidates = ['pdf', 'docx', 'html', 'txt'];
       } else if (cleanExt === 'html' || cleanExt === 'htm') {
@@ -133,7 +139,8 @@ export function getCompatibleTargets(ext: string, category: FileCategory): Forma
     }
 
     case 'audio': {
-      const candidates = ['wav', 'mp3', 'ogg'];
+      // Only WAV can actually be encoded in the browser without extra libraries
+      const candidates = ['wav'];
       candidates.forEach(c => {
         if (c !== cleanExt && ALL_FORMATS[c]) {
           targets.push(ALL_FORMATS[c]);

@@ -72,7 +72,7 @@ export const CompatibilityMatrix: React.FC = () => {
                 onClick={() => setActiveCategory(cat.id as any)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
                   activeCategory === cat.id
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    ? 'bg-indigo-600 text-white'
                     : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
                 }`}
               >

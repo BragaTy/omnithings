@@ -290,7 +290,7 @@ export const PdfToolsGrid: React.FC<PdfToolsGridProps> = ({ onSelectTool }) => {
               onClick={() => setFilter(tab.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 filter === tab.id
-                  ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30'
+                  ? 'bg-rose-600 text-white'
                   : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
               }`}
             >
@@ -316,7 +316,7 @@ export const PdfToolsGrid: React.FC<PdfToolsGridProps> = ({ onSelectTool }) => {
           <div
             key={tool.id}
             onClick={() => onSelectTool(tool)}
-            className="group relative p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-900 transition-all cursor-pointer flex flex-col justify-between hover:scale-[1.02] shadow-lg hover:shadow-rose-500/10"
+            className="group relative p-5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-rose-500/50 hover:bg-slate-900 transition-all cursor-pointer flex flex-col justify-between hover:scale-[1.02]"
           >
             <div>
               <div className="flex items-start justify-between mb-3">

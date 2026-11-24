@@ -14,6 +14,10 @@ export async function convertAudio(
     throw new Error('Web Audio API não é suportada neste navegador.');
   }
 
+  if (target !== 'wav') {
+    throw new Error(`Conversão de áudio para ${target.toUpperCase()} ainda não é suportada no navegador. Use WAV.`);
+  }
+
   const audioCtx = new AudioContextClass();
   const arrayBuffer = await file.arrayBuffer();
 
@@ -46,18 +50,6 @@ export async function convertAudio(
 
   audioCtx.close();
 
-  if (target === 'wav') {
-    const wavBlob = audioBufferToWav(finalBuffer);
-    return { blob: wavBlob, filename: `${baseName}.wav` };
-  }
-
-  // Fallback or WebM audio if supported
-  if (target === 'ogg' || target === 'webm') {
-    const wavBlob = audioBufferToWav(finalBuffer);
-    return { blob: wavBlob, filename: `${baseName}.wav` };
-  }
-
-  // Default to WAV
   const wavBlob = audioBufferToWav(finalBuffer);
   return { blob: wavBlob, filename: `${baseName}.wav` };
 }

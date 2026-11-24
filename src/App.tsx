@@ -17,6 +17,8 @@ import { FileItem, ConversionOptions } from './types';
 import { createFileItem, downloadBlob } from './utils/fileHelpers';
 import { convertSingleFile } from './converters';
 import { packageToZip } from './converters/archiveConverter';
+import { getCompatibleTargets } from './constants/formats';
+import { ConversionHero } from './components/ConversionHero';
 import { Sparkles, FileCode, FileSpreadsheet, Image as ImageIcon, ArrowLeftRight, FileText, Video } from 'lucide-react';
 
 export function App() {
@@ -142,13 +144,18 @@ export function App() {
 
   // Set target format for all files
   const handleSetGlobalTarget = useCallback((target: string) => {
-    setFiles(prev => prev.map(item => ({
-      ...item,
-      targetFormat: target,
-      status: 'idle',
-      resultBlob: undefined,
-      resultUrl: undefined
-    })));
+    // Only apply to files that can actually be converted to this format
+    setFiles(prev => prev.map(item => {
+      const compatible = getCompatibleTargets(item.extension, item.category).some(t => t.extension === target);
+      if (!compatible) return item;
+      return {
+        ...item,
+        targetFormat: target,
+        status: 'idle',
+        resultBlob: undefined,
+        resultUrl: undefined
+      };
+    }));
   }, []);
 
   // Save customized conversion settings
@@ -192,7 +199,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       <Header currentView={currentView} onSelectView={setCurrentView} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10">
@@ -200,59 +207,7 @@ export function App() {
         {/* MODE 1: Universal Converter */}
         {currentView === 'converter' && (
           <div className="space-y-10 animate-fade-in">
-            {/* Hero Section */}
-            <div className="text-center max-w-3xl mx-auto space-y-4">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                <span>Conversor Universal 100% no Navegador • GitHub Pages Ready</span>
-              </div>
-
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight text-white leading-tight">
-                Converta <span className="bg-gradient-to-r from-indigo-400 via-cyan-300 to-indigo-300 bg-clip-text text-transparent">qualquer arquivo</span> para outro compatível
-              </h1>
-
-              <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto">
-                Transforme imagens, documentos, planilhas, tabelas e áudios com total privacidade. 
-                Sem envio para servidores na nuvem, sem filas e com download individual ou em lote (.ZIP).
-              </p>
-
-              {/* Sample quick test buttons */}
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-xs">
-                <span className="text-slate-500 text-[11px] font-medium mr-1">Quer testar agora?</span>
-                <button
-                  type="button"
-                  onClick={() => handleAddSample('csv')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-emerald-500/50 hover:bg-slate-850 text-slate-300 transition-colors"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Testar com CSV</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddSample('json')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-amber-500/50 hover:bg-slate-850 text-slate-300 transition-colors"
-                >
-                  <FileCode className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Testar com JSON</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddSample('markdown')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-sky-500/50 hover:bg-slate-850 text-slate-300 transition-colors"
-                >
-                  <FileCode className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Testar com Markdown</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAddSample('image')}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-pink-500/50 hover:bg-slate-850 text-slate-300 transition-colors"
-                >
-                  <ImageIcon className="w-3.5 h-3.5 text-pink-400" />
-                  <span>Testar com Imagem SVG</span>
-                </button>
-              </div>
-            </div>
+            <ConversionHero onTrySample={handleAddSample} />
 
             {/* Drop Zone */}
             <DropZone onFilesSelected={handleFilesSelected} />
@@ -299,17 +254,13 @@ export function App() {
         {/* MODE 2: PDF Suite (All 32 Tools) */}
         {currentView === 'pdf' && (
           <div className="space-y-8 animate-fade-in">
-            <div className="text-center max-w-2xl mx-auto space-y-3">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/10 text-rose-400 text-xs font-semibold border border-rose-500/20">
-                <FileText className="w-3.5 h-3.5" />
-                <span>Suite Completa de 32 Ferramentas PDF</span>
-              </div>
-              <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                Todas as ferramentas PDF que você precisa
+            <div className="max-w-2xl space-y-3">
+              <h1 className="text-3xl sm:text-5xl font-extrabold text-slate-50 leading-[1.05]">
+                Tudo o que dá para fazer com um PDF
               </h1>
-              <p className="text-slate-400 text-sm">
-                Junte, divida, comprima, converta, edite, assine e proteja documentos PDF.
-                100% gratuito e processado diretamente no seu navegador.
+              <p className="text-slate-300 text-base leading-relaxed">
+                Junte, divida, comprima, converta, edite, assine e proteja. Todas as ferramentas
+                rodam no seu navegador.
               </p>
             </div>
 

@@ -40,6 +40,11 @@ export async function convertSingleFile(
 
   if (target === 'unzip' || (item.category === 'archive' && target === 'extract')) {
     onProgress?.(40);
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    if (!(head[0] === 0x50 && head[1] === 0x4b)) {
+      const ext = (file.name.split('.').pop() || '').toUpperCase();
+      throw new Error(`Apenas arquivos ZIP podem ser extraídos. O formato ${ext} (RAR/7Z/TAR/GZ) ainda não é suportado.`);
+    }
     const { entries } = await extractZip(file);
     onProgress?.(80);
     if (entries.length === 0) {
@@ -48,7 +53,7 @@ export async function convertSingleFile(
     // If multiple entries, repackage as zip or if single entry return it
     if (entries.length === 1) {
       onProgress?.(100);
-      return { blob: entries[0].blob, filename: entries[0].name };
+      return { blob: entries[0].blob, filename: entries[0].name.split('/').pop() || entries[0].name };
     }
     const res = await packageToZip(entries, `extraido_${file.name}`);
     onProgress?.(100);

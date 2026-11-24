@@ -154,13 +154,9 @@ export const MediaToolsView: React.FC = () => {
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Studio Banner */}
-      <div className="rounded-3xl bg-gradient-to-r from-purple-900/40 via-indigo-900/30 to-slate-900/60 border border-purple-500/20 p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6">
+      <div className="border-b border-slate-800 pb-8 flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-500/10 text-purple-400 text-xs font-semibold border border-purple-500/20 mb-3">
-            <Video className="w-3.5 h-3.5" />
-            <span>Estúdio Multimídia 100% no Navegador</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+          <h2 className="text-3xl sm:text-5xl font-extrabold text-slate-50 leading-[1.05]">
             Estúdio de Vídeo e Áudio
           </h2>
           <p className="text-slate-400 text-sm max-w-xl mt-1 leading-relaxed">
@@ -184,7 +180,7 @@ export const MediaToolsView: React.FC = () => {
               onClick={() => { setActiveTab(tab.id as MediaTab); resetState(); }}
               className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                 activeTab === tab.id
-                  ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+                  ? 'bg-purple-600 text-white'
                   : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700'
               }`}
             >
@@ -224,7 +220,7 @@ export const MediaToolsView: React.FC = () => {
                 type="button"
                 disabled={loading}
                 onClick={handleMuteVideo}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg shadow-purple-600/30 transition-all"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-semibold text-xs transition-all"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <VolumeX className="w-4 h-4" />}
                 <span>{loading ? `Processando vídeo (${progress}%)...` : 'Remover Áudio Agora'}</span>
@@ -260,7 +256,7 @@ export const MediaToolsView: React.FC = () => {
                 type="button"
                 disabled={loading}
                 onClick={handleExtractAudio}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg shadow-purple-600/30 transition-all"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-semibold text-xs transition-all"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Music className="w-4 h-4" />}
                 <span>{loading ? 'Extraindo áudio...' : 'Extrair Áudio do Vídeo'}</span>
@@ -319,7 +315,7 @@ export const MediaToolsView: React.FC = () => {
                   type="button"
                   disabled={loading}
                   onClick={handleTrimVideo}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg shadow-cyan-600/30 transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-semibold text-xs transition-all"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
                   <span>{loading ? `Cortando (${progress}%)...` : 'Cortar e Salvar Vídeo'}</span>
@@ -358,7 +354,7 @@ export const MediaToolsView: React.FC = () => {
                 type="button"
                 disabled={loading}
                 onClick={handleMergeAudio}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg shadow-emerald-600/30 transition-all"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold text-xs transition-all"
               >
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
                 <span>{loading ? 'Mesclando faixas...' : 'Juntar Áudios'}</span>
@@ -417,7 +413,7 @@ export const MediaToolsView: React.FC = () => {
                   type="button"
                   disabled={loading}
                   onClick={handleTrimAudio}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs shadow-lg shadow-amber-600/30 transition-all"
+                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white font-semibold text-xs transition-all"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Scissors className="w-4 h-4" />}
                   <span>{loading ? 'Cortando áudio...' : 'Cortar e Salvar Áudio'}</span>
@@ -451,8 +447,8 @@ export const MediaToolsView: React.FC = () => {
                 onClick={handleToggleRecord}
                 className={`inline-flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-bold text-white shadow-lg transition-all ${
                   isRecording
-                    ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/40 animate-pulse'
-                    : 'bg-indigo-600 hover:bg-indigo-500 shadow-indigo-600/30'
+                    ? 'bg-rose-600 hover:bg-rose-500 animate-pulse'
+                    : 'bg-indigo-600 hover:bg-indigo-500'
                 }`}
               >
                 {isRecording ? (
@@ -492,7 +488,7 @@ export const MediaToolsView: React.FC = () => {
             <button
               type="button"
               onClick={() => downloadBlob(resultBlob, resultName)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/30 transition-all"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Baixar Arquivo</span>

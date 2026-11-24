@@ -12,6 +12,8 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesSelected, isCompact =
 
   // Allow pasting files from clipboard (e.g. screenshots or copied files)
   useEffect(() => {
+    // Only the main drop zone listens; otherwise each paste adds the files twice
+    if (isCompact) return;
     const handlePaste = (e: ClipboardEvent) => {
       if (e.clipboardData && e.clipboardData.files.length > 0) {
         const pastedFiles = Array.from(e.clipboardData.files);
@@ -20,7 +22,7 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesSelected, isCompact =
     };
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [onFilesSelected]);
+  }, [onFilesSelected, isCompact]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -55,10 +57,18 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesSelected, isCompact =
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         onClick={() => fileInputRef.current?.click()}
-        className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInputRef.current?.click();
+          }
+        }}
+        className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-colors ${
           isDragging
-            ? 'border-indigo-400 bg-indigo-500/10 scale-[1.01]'
-            : 'border-slate-700 hover:border-slate-600 bg-slate-900/40 hover:bg-slate-900/60'
+            ? 'border-indigo-400 bg-indigo-500/10'
+            : 'border-slate-700 hover:border-slate-500 bg-slate-900/40 hover:bg-slate-900'
         }`}
       >
         <input
@@ -69,27 +79,42 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesSelected, isCompact =
           onChange={handleInputChange}
         />
         <div className="flex items-center justify-center gap-3 text-slate-300">
-          <div className="p-2 rounded-xl bg-indigo-500/20 text-indigo-400">
-            <Plus className="w-5 h-5" />
-          </div>
+          <Plus className="w-5 h-5 text-indigo-300" aria-hidden="true" />
           <span className="font-medium text-sm">
-            Arraste mais arquivos aqui ou clique para adicionar
+            Adicionar mais arquivos
           </span>
         </div>
       </div>
     );
   }
 
+  const groups: { label: string; icon: React.ReactNode; exts: string }[] = [
+    { label: 'Imagens', icon: <ImageIcon className="w-4 h-4 text-pink-300" />, exts: 'png jpg webp svg ico bmp gif' },
+    { label: 'Documentos', icon: <FileText className="w-4 h-4 text-sky-300" />, exts: 'pdf docx doc odt rtf md html txt' },
+    { label: 'Dados', icon: <FileSpreadsheet className="w-4 h-4 text-emerald-300" />, exts: 'csv xlsx xls json yaml xml' },
+    { label: 'Áudio', icon: <Music className="w-4 h-4 text-purple-300" />, exts: 'mp3 wav ogg m4a flac' },
+    { label: 'Arquivos', icon: <Archive className="w-4 h-4 text-amber-300" />, exts: 'zip' },
+  ];
+
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Selecionar arquivos para converter"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={() => fileInputRef.current?.click()}
-      className={`relative group rounded-3xl border-2 border-dashed transition-all duration-300 cursor-pointer overflow-hidden ${
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          fileInputRef.current?.click();
+        }
+      }}
+      className={`rounded-xl border-2 border-dashed cursor-pointer transition-colors ${
         isDragging
-          ? 'border-indigo-400 bg-indigo-600/10 scale-[1.01] shadow-2xl shadow-indigo-500/20'
-          : 'border-slate-800 hover:border-indigo-500/50 bg-gradient-to-b from-slate-900/60 to-slate-950/80 hover:bg-slate-900/90 shadow-xl'
+          ? 'border-indigo-400 bg-indigo-600/10'
+          : 'border-slate-700 bg-slate-900/50 hover:border-slate-500 hover:bg-slate-900'
       }`}
     >
       <input
@@ -100,60 +125,38 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesSelected, isCompact =
         onChange={handleInputChange}
       />
 
-      {/* Decorative ambient gradient */}
-      <div className="absolute inset-0 bg-radial from-indigo-500/10 via-transparent to-transparent opacity-50 group-hover:opacity-100 transition-opacity pointer-events-none" />
-
-      <div className="relative px-6 py-12 sm:py-16 text-center max-w-2xl mx-auto flex flex-col items-center">
-        {/* Animated Icon Circle */}
-        <div className="relative mb-6">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 p-0.5 shadow-xl shadow-indigo-500/25 group-hover:scale-105 transition-transform">
-            <div className="w-full h-full bg-slate-950 rounded-[14px] flex items-center justify-center">
-              <UploadCloud className="w-10 h-10 text-indigo-400 group-hover:text-cyan-300 transition-colors" />
-            </div>
+      <div className="grid gap-8 px-6 py-10 sm:px-10 sm:py-12 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="flex items-start gap-5">
+          <UploadCloud className={`w-10 h-10 shrink-0 ${isDragging ? 'text-indigo-300' : 'text-slate-400'}`} aria-hidden="true" />
+          <div>
+            <h2 className="text-2xl font-bold text-slate-50">
+              {isDragging ? 'Pode soltar' : 'Arraste arquivos para cá'}
+            </h2>
+            <p className="mt-1.5 text-slate-400">
+              Ou clique para escolher no computador. Também dá para colar com{' '}
+              <kbd className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 text-xs text-slate-200">Ctrl</kbd>
+              {' + '}
+              <kbd className="px-1.5 py-0.5 rounded border border-slate-700 bg-slate-800 text-xs text-slate-200">V</kbd>.
+            </p>
           </div>
-          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cyan-400 animate-ping opacity-75" />
         </div>
 
-        <h3 className="text-xl sm:text-2xl font-bold text-white mb-2 tracking-tight">
-          Arraste e solte seus arquivos aqui
-        </h3>
-        <p className="text-slate-400 text-sm max-w-md mb-6 leading-relaxed">
-          Suporta imagens, documentos, planilhas, arquivos de áudio e dados estruturados.
-          Você também pode <kbd className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs font-mono border border-slate-700">Ctrl + V</kbd> para colar direto da área de transferência!
-        </p>
-
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            fileInputRef.current?.click();
-          }}
-          className="inline-flex items-center gap-2.5 px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/40 active:scale-95 transition-all"
-        >
-          <UploadCloud className="w-4 h-4" />
-          Selecionar Arquivos no Computador
-        </button>
-
-        {/* Format categories pills */}
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2 pt-6 border-t border-slate-800/80 text-xs text-slate-400">
-          <span className="text-slate-500 font-medium">Suporta:</span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-            <ImageIcon className="w-3.5 h-3.5 text-pink-400" /> Imagens (PNG, JPG, WEBP, ICO, SVG)
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Planilhas (CSV, XLSX, TSV)
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-            <FileText className="w-3.5 h-3.5 text-sky-400" /> Documentos (PDF, MD, HTML, JSON, YAML)
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-            <Music className="w-3.5 h-3.5 text-purple-400" /> Áudio (MP3, WAV, OGG, AAC)
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800/80 border border-slate-700/60 text-slate-300">
-            <Archive className="w-3.5 h-3.5 text-amber-400" /> ZIP & Hashes
-          </span>
-        </div>
+        <span className="inline-flex items-center justify-center gap-2 self-start md:self-center rounded-lg bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-500 transition-colors">
+          Escolher arquivos
+        </span>
       </div>
+
+      <ul className="grid gap-x-8 gap-y-2 border-t border-slate-800 px-6 py-5 sm:px-10 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+        {groups.map(g => (
+          <li key={g.label} className="flex items-start gap-2">
+            <span className="mt-0.5" aria-hidden="true">{g.icon}</span>
+            <span>
+              <span className="text-slate-200">{g.label}</span>
+              <span className="block font-mono text-xs text-slate-500">{g.exts}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

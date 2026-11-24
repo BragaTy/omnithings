@@ -2,123 +2,131 @@ import * as XLSX from 'xlsx';
 import * as yaml from 'js-yaml';
 import { jsPDF } from 'jspdf';
 import { ConversionOptions } from '../types';
+import { readTextSmart, toPdfSafeText, escapeHtml, getBaseName, getExtension } from './textUtils';
+
+type Row = Record<string, any>;
 
 export async function convertData(
   file: File,
   targetFormat: string,
   options: ConversionOptions
 ): Promise<{ blob: Blob; filename: string }> {
-  const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
-  const inputExt = (file.name.split('.').pop() || '').toLowerCase();
+  const baseName = getBaseName(file.name);
+  const inputExt = getExtension(file.name);
   const target = targetFormat.toLowerCase();
 
-  // 1. Parse input file into a normalized JavaScript data structure
-  let normalizedData: any = null;
+  // 1. Parse input into a JS structure (kept as close to the original as possible)
+  let data: any = null;
 
-  if (inputExt === 'xlsx' || inputExt === 'xls') {
+  if (inputExt === 'xlsx' || inputExt === 'xls' || inputExt === 'ods') {
     const buffer = await file.arrayBuffer();
     const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
-    const firstSheetName = workbook.SheetNames[0];
-    const sheet = workbook.Sheets[firstSheetName];
-    normalizedData = XLSX.utils.sheet_to_json(sheet);
-  } else if (inputExt === 'csv' || inputExt === 'tsv') {
-    const rawText = await file.text();
-    const cleanText = rawText.replace(/^\uFEFF/, ''); // Strip BOM
-    const delimiter = inputExt === 'tsv' ? '\t' : (options.csvDelimiter || detectCsvDelimiter(cleanText));
-    normalizedData = parseCsvToObjects(cleanText, delimiter);
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) throw new Error('A planilha não contém nenhuma aba.');
+    const sheet = workbook.Sheets[sheetName];
+    // defval keeps empty cells so every row has every column
+    const rows = XLSX.utils.sheet_to_json<Row>(sheet, { defval: '', raw: true });
+    data = rows.map(r => {
+      const out: Row = {};
+      for (const [k, v] of Object.entries(r)) out[k] = v instanceof Date ? formatDate(v) : v;
+      return out;
+    });
+  } else if (inputExt === 'csv' || inputExt === 'tsv' || inputExt === 'txt') {
+    const text = (await readTextSmart(file)).replace(/^﻿/, '');
+    const delimiter = inputExt === 'tsv' ? '\t' : detectCsvDelimiter(text);
+    data = csvToObjects(parseCsv(text, delimiter));
   } else if (inputExt === 'json') {
-    const text = await file.text();
+    const text = (await readTextSmart(file)).replace(/^﻿/, '');
     try {
-      normalizedData = JSON.parse(text);
+      data = JSON.parse(text);
     } catch {
-      throw new Error('Arquivo JSON inválido ou mal formatado.');
+      // JSON Lines (one object per line)
+      try {
+        data = text.split(/\r?\n/).filter(l => l.trim()).map(l => JSON.parse(l));
+      } catch {
+        throw new Error('Arquivo JSON inválido ou mal formatado.');
+      }
     }
   } else if (inputExt === 'yaml' || inputExt === 'yml') {
-    const text = await file.text();
+    const text = await readTextSmart(file);
     try {
-      normalizedData = yaml.load(text);
-    } catch {
-      throw new Error('Arquivo YAML inválido ou mal formatado.');
+      try {
+        data = yaml.load(text);
+      } catch (single) {
+        // Files with several "---" documents
+        const loadAll = (yaml as any).loadAll;
+        if (typeof loadAll !== 'function') throw single;
+        data = (loadAll(text) as unknown[]).filter(d => d !== undefined);
+      }
+    } catch (e: any) {
+      throw new Error(`Arquivo YAML inválido: ${e?.message || 'erro de sintaxe'}`);
     }
   } else if (inputExt === 'xml') {
-    const text = await file.text();
-    normalizedData = parseXmlToJson(text);
+    data = parseXmlToJson(await readTextSmart(file));
   } else {
-    // Fallback: try reading as JSON, then plain text lines
-    const text = await file.text();
+    const text = await readTextSmart(file);
     try {
-      normalizedData = JSON.parse(text);
+      data = JSON.parse(text);
     } catch {
       const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
-      normalizedData = lines.map((l, i) => ({ linha: i + 1, conteudo: l }));
+      data = lines.map((l, i) => ({ linha: i + 1, conteudo: l }));
     }
   }
 
-  // 2. Serialize normalizedData into the requested targetFormat
+  // 2. Serialize
   switch (target) {
     case 'json': {
-      const indent = options.jsonIndent ?? 2;
-      const jsonStr = JSON.stringify(normalizedData, null, indent);
-      const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
-      return { blob, filename: `${baseName}.json` };
+      const jsonStr = JSON.stringify(data, null, options.jsonIndent ?? 2);
+      return { blob: new Blob([jsonStr], { type: 'application/json;charset=utf-8' }), filename: `${baseName}.json` };
     }
 
     case 'xlsx': {
+      const { headers, rows } = toTable(data);
       const wb = XLSX.utils.book_new();
-      const rows = Array.isArray(normalizedData) ? normalizedData : [normalizedData];
-      const ws = XLSX.utils.json_to_sheet(rows);
+      const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
+      ws['!cols'] = headers.map(h => ({
+        wch: Math.min(60, Math.max(h.length, ...rows.slice(0, 200).map(r => String(r[h] ?? '').length)) + 2),
+      }));
       XLSX.utils.book_append_sheet(wb, ws, 'Dados');
       const wbOut = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-      const blob = new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      return { blob, filename: `${baseName}.xlsx` };
+      return {
+        blob: new Blob([wbOut], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+        filename: `${baseName}.xlsx`,
+      };
     }
 
     case 'csv': {
-      const delimiter = options.csvDelimiter || ',';
-      const csvStr = objectsToCsv(normalizedData, delimiter);
-      const blob = new Blob(['\uFEFF' + csvStr], { type: 'text/csv;charset=utf-8' });
-      return { blob, filename: `${baseName}.csv` };
+      const csvStr = tableToCsv(toTable(data), options.csvDelimiter || ',');
+      return { blob: new Blob(['﻿' + csvStr], { type: 'text/csv;charset=utf-8' }), filename: `${baseName}.csv` };
     }
 
     case 'tsv': {
-      const tsvStr = objectsToCsv(normalizedData, '\t');
-      const blob = new Blob(['\uFEFF' + tsvStr], { type: 'text/tab-separated-values;charset=utf-8' });
-      return { blob, filename: `${baseName}.tsv` };
+      const tsvStr = tableToCsv(toTable(data), '\t');
+      return { blob: new Blob(['﻿' + tsvStr], { type: 'text/tab-separated-values;charset=utf-8' }), filename: `${baseName}.tsv` };
     }
 
     case 'yaml':
     case 'yml': {
-      const yamlStr = yaml.dump(normalizedData, { indent: options.yamlIndent ?? 2 });
-      const blob = new Blob([yamlStr], { type: 'application/x-yaml;charset=utf-8' });
-      return { blob, filename: `${baseName}.yaml` };
+      const yamlStr = yaml.dump(data, { indent: options.yamlIndent ?? 2, lineWidth: -1, noRefs: true });
+      return { blob: new Blob([yamlStr], { type: 'application/x-yaml;charset=utf-8' }), filename: `${baseName}.${target}` };
     }
 
     case 'xml': {
-      const xmlStr = jsonToXml(normalizedData);
-      const blob = new Blob([xmlStr], { type: 'application/xml;charset=utf-8' });
-      return { blob, filename: `${baseName}.xml` };
+      return { blob: new Blob([jsonToXml(data)], { type: 'application/xml;charset=utf-8' }), filename: `${baseName}.xml` };
     }
 
     case 'html': {
-      const htmlTable = objectsToHtmlTable(normalizedData, baseName);
-      const blob = new Blob([htmlTable], { type: 'text/html;charset=utf-8' });
-      return { blob, filename: `${baseName}.html` };
+      const html = tableToHtml(toTable(data), baseName);
+      return { blob: new Blob([html], { type: 'text/html;charset=utf-8' }), filename: `${baseName}.html` };
     }
 
     case 'pdf': {
-      const pdfBlob = generateTablePdf(normalizedData, baseName, options);
-      return { blob: pdfBlob, filename: `${baseName}.pdf` };
+      return { blob: generateTablePdf(toTable(data), baseName, options), filename: `${baseName}.pdf` };
     }
 
     case 'txt': {
-      let txtContent = '';
-      if (typeof normalizedData === 'string') {
-        txtContent = normalizedData;
-      } else {
-        txtContent = JSON.stringify(normalizedData, null, 2);
-      }
-      const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
-      return { blob, filename: `${baseName}.txt` };
+      const txt = typeof data === 'string' ? data : tableToText(toTable(data));
+      return { blob: new Blob([txt], { type: 'text/plain;charset=utf-8' }), filename: `${baseName}.txt` };
     }
 
     default:
@@ -126,35 +134,379 @@ export async function convertData(
   }
 }
 
-// Auto-detect CSV delimiter by inspecting frequency in first 5 lines
-function detectCsvDelimiter(text: string): string {
-  const firstLines = text.split(/\r?\n/).slice(0, 5).join('\n');
-  const countComma = (firstLines.match(/,/g) || []).length;
-  const countSemicolon = (firstLines.match(/;/g) || []).length;
-  const countTab = (firstLines.match(/\t/g) || []).length;
-  const countPipe = (firstLines.match(/\|/g) || []).length;
-
-  if (countSemicolon > countComma && countSemicolon > countTab) return ';';
-  if (countTab > countComma && countTab > countSemicolon) return '\t';
-  if (countPipe > countComma && countPipe > countSemicolon) return '|';
-  return ',';
+function formatDate(d: Date): string {
+  if (isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  if (d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0) return date;
+  return `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
-// Generate formatted PDF table with auto orientation, zebra striping, and pagination
-function generateTablePdf(data: any, title: string, options: ConversionOptions): Blob {
-  const rows = Array.isArray(data) ? data : [data];
-  if (rows.length === 0) {
-    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+// ---------------------------------------------------------------------------
+// Tabular normalization
+// ---------------------------------------------------------------------------
+
+/**
+ * Turns any parsed structure into rows + columns:
+ * - finds the main array inside wrapper objects ({ data: [...] }, XML roots, …)
+ * - flattens nested objects using dot notation (endereco.cidade)
+ * - uses the union of keys of all rows as columns (not just the first row)
+ */
+export function toTable(data: any): { headers: string[]; rows: Row[] } {
+  const records = findRecords(data);
+  const rows: Row[] = records.map(r => {
+    if (r === null || typeof r !== 'object') return { valor: r ?? '' };
+    if (Array.isArray(r)) {
+      const o: Row = {};
+      r.forEach((v, i) => (o[`col_${i + 1}`] = v));
+      return flattenObject(o);
+    }
+    return flattenObject(r);
+  });
+
+  const headers: string[] = [];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    for (const k of Object.keys(r)) {
+      if (!seen.has(k)) {
+        seen.add(k);
+        headers.push(k);
+      }
+    }
+  }
+  return { headers, rows };
+}
+
+function findRecords(data: any): any[] {
+  if (Array.isArray(data)) return data;
+  if (data === null || typeof data !== 'object') return data === null || data === undefined ? [] : [data];
+
+  // Walk down single-key wrappers and look for the largest array of objects
+  let current = data;
+  for (let depth = 0; depth < 5; depth++) {
+    if (Array.isArray(current)) return current;
+    if (current === null || typeof current !== 'object') break;
+    const entries = Object.entries(current);
+    const arrays = entries.filter(([, v]) => Array.isArray(v) && (v as any[]).length > 0);
+    if (arrays.length > 0) {
+      arrays.sort((a, b) => (b[1] as any[]).length - (a[1] as any[]).length);
+      const [, arr] = arrays[0];
+      const others = entries.filter(([, v]) => !Array.isArray(v) && (v === null || typeof v !== 'object'));
+      // Only unwrap if the array is clearly the "content" of the object
+      if (arrays.length === 1 && others.length <= 3) return arr as any[];
+      if (arrays.length > 1) return arr as any[];
+    }
+    const objectChildren = entries.filter(([, v]) => v !== null && typeof v === 'object');
+    if (entries.length === 1 && objectChildren.length === 1) {
+      current = objectChildren[0][1];
+      continue;
+    }
+    break;
+  }
+  return [data];
+}
+
+function flattenObject(obj: any, prefix = '', out: Row = {}): Row {
+  for (const [key, value] of Object.entries(obj)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (value instanceof Date) {
+      out[path] = formatDate(value);
+    } else if (Array.isArray(value)) {
+      if (value.every(v => v === null || typeof v !== 'object')) {
+        out[path] = value.join(', ');
+      } else {
+        out[path] = JSON.stringify(value);
+      }
+    } else if (value !== null && typeof value === 'object') {
+      if (Object.keys(value).length === 0) out[path] = '';
+      else flattenObject(value, path, out);
+    } else {
+      out[path] = value ?? '';
+    }
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// CSV
+// ---------------------------------------------------------------------------
+
+// Pick the delimiter that produces the most consistent column count
+function detectCsvDelimiter(text: string): string {
+  const sample = text.slice(0, 20000);
+  const candidates = [',', ';', '\t', '|'];
+  let best = ',';
+  let bestScore = 0;
+  for (const d of candidates) {
+    const rows = parseCsv(sample, d).slice(0, 20);
+    if (rows.length === 0) continue;
+    const cols = rows[0].length;
+    if (cols < 2) continue;
+    const consistent = rows.filter(r => r.length === cols).length;
+    const score = consistent * cols;
+    if (score > bestScore) {
+      bestScore = score;
+      best = d;
+    }
+  }
+  return best;
+}
+
+/** RFC 4180 parser: handles quotes, escaped quotes and line breaks inside fields. */
+export function parseCsv(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  let i = 0;
+  const n = text.length;
+
+  while (i < n) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      field += ch;
+      i++;
+      continue;
+    }
+    if (ch === '"' && field.length === 0) {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (ch === delimiter) {
+      row.push(field);
+      field = '';
+      i++;
+      continue;
+    }
+    if (ch === '\r' || ch === '\n') {
+      row.push(field);
+      field = '';
+      if (!(row.length === 1 && row[0] === '')) rows.push(row);
+      row = [];
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      i++;
+      continue;
+    }
+    field += ch;
+    i++;
+  }
+  row.push(field);
+  if (!(row.length === 1 && row[0] === '')) rows.push(row);
+  return rows;
+}
+
+function csvToObjects(rows: string[][]): Row[] {
+  if (rows.length === 0) return [];
+  const rawHeaders = rows[0].map(h => h.trim());
+  const maxCols = Math.max(...rows.map(r => r.length));
+  // Make headers unique and non-empty
+  const headers: string[] = [];
+  const used = new Map<string, number>();
+  for (let i = 0; i < maxCols; i++) {
+    let h = rawHeaders[i] || `coluna_${i + 1}`;
+    const count = used.get(h) || 0;
+    used.set(h, count + 1);
+    if (count > 0) h = `${h}_${count + 1}`;
+    headers.push(h);
+  }
+  return rows.slice(1).map(values => {
+    const obj: Row = {};
+    headers.forEach((h, idx) => (obj[h] = values[idx] ?? ''));
+    return obj;
+  });
+}
+
+function cellToString(val: any): string {
+  if (val === null || val === undefined) return '';
+  if (val instanceof Date) return formatDate(val);
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val);
+}
+
+function tableToCsv({ headers, rows }: { headers: string[]; rows: Row[] }, delimiter: string): string {
+  if (headers.length === 0) return '';
+  const esc = (val: any) => {
+    const str = cellToString(val);
+    if (str.includes(delimiter) || str.includes('"') || str.includes('\n') || str.includes('\r') || /^\s|\s$/.test(str)) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+  const lines = [headers.map(esc).join(delimiter)];
+  for (const r of rows) lines.push(headers.map(h => esc(r[h])).join(delimiter));
+  return lines.join('\r\n');
+}
+
+function tableToText({ headers, rows }: { headers: string[]; rows: Row[] }): string {
+  if (headers.length === 0) return '';
+  const widths = headers.map(h =>
+    Math.min(40, Math.max(h.length, ...rows.map(r => cellToString(r[h]).length)))
+  );
+  const fmt = (vals: string[]) =>
+    vals.map((v, i) => (v.length > widths[i] ? v.slice(0, widths[i] - 1) + '…' : v.padEnd(widths[i]))).join(' | ').trimEnd();
+  const out = [fmt(headers), widths.map(w => '-'.repeat(w)).join('-+-')];
+  for (const r of rows) out.push(fmt(headers.map(h => cellToString(r[h]).replace(/\r?\n/g, ' '))));
+  return out.join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// XML
+// ---------------------------------------------------------------------------
+
+function parseXmlToJson(xmlText: string): any {
+  const xmlDoc = new DOMParser().parseFromString(xmlText, 'application/xml');
+  const err = xmlDoc.getElementsByTagName('parsererror')[0];
+  if (err) {
+    throw new Error('Arquivo XML inválido ou mal formatado.');
+  }
+
+  const parseElement = (el: Element): any => {
+    const obj: Row = {};
+    for (const attr of Array.from(el.attributes)) {
+      if (attr.name.startsWith('xmlns')) continue;
+      obj[`@${attr.name}`] = attr.value;
+    }
+
+    let text = '';
+    let hasElementChildren = false;
+    for (const child of Array.from(el.childNodes)) {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        hasElementChildren = true;
+        const name = (child as Element).nodeName;
+        const value = parseElement(child as Element);
+        if (name in obj) {
+          if (!Array.isArray(obj[name])) obj[name] = [obj[name]];
+          obj[name].push(value);
+        } else {
+          obj[name] = value;
+        }
+      } else if (child.nodeType === Node.TEXT_NODE || child.nodeType === Node.CDATA_SECTION_NODE) {
+        text += child.nodeValue || '';
+      }
+    }
+
+    text = text.trim();
+    const hasAttrs = Object.keys(obj).some(k => k.startsWith('@'));
+    if (!hasElementChildren && !hasAttrs) return text;
+    if (text) obj['#text'] = text;
+    return obj;
+  };
+
+  const root = xmlDoc.documentElement;
+  return { [root.nodeName]: parseElement(root) };
+}
+
+function toXmlName(key: string): string {
+  let name = key.replace(/[^\p{L}\p{N}_.-]/gu, '_');
+  if (!/^[\p{L}_]/u.test(name)) name = `_${name}`;
+  return name;
+}
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function jsonToXml(data: any): string {
+  const build = (value: any, name: string, indent: string): string => {
+    const tag = toXmlName(name);
+    if (value === null || value === undefined) return `${indent}<${tag}/>`;
+    if (Array.isArray(value)) {
+      // Repeated elements share the parent key name
+      return value.map(v => build(v, name, indent)).join('\n');
+    }
+    if (value instanceof Date) return `${indent}<${tag}>${formatDate(value)}</${tag}>`;
+    if (typeof value !== 'object') return `${indent}<${tag}>${escapeXml(String(value))}</${tag}>`;
+
+    let attrs = '';
+    let text = '';
+    const children: string[] = [];
+    for (const [k, v] of Object.entries(value)) {
+      if (k.startsWith('@')) attrs += ` ${toXmlName(k.slice(1))}="${escapeXml(String(v ?? ''))}"`;
+      else if (k === '#text') text = escapeXml(String(v ?? ''));
+      else children.push(build(v, k, indent + '  '));
+    }
+    if (children.length === 0) {
+      return text ? `${indent}<${tag}${attrs}>${text}</${tag}>` : `${indent}<${tag}${attrs}/>`;
+    }
+    const textLine = text ? `${indent}  ${text}\n` : '';
+    return `${indent}<${tag}${attrs}>\n${textLine}${children.join('\n')}\n${indent}</${tag}>`;
+  };
+
+  let body: string;
+  const keys = data && typeof data === 'object' && !Array.isArray(data) ? Object.keys(data) : [];
+  if (keys.length === 1 && !Array.isArray(data[keys[0]])) {
+    // Already has a single root element (e.g. came from XML)
+    body = build(data[keys[0]], keys[0], '');
+  } else if (Array.isArray(data)) {
+    body = `<root>\n${data.map(v => build(v, 'item', '  ')).join('\n')}\n</root>`;
+  } else {
+    body = build(data, 'root', '');
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>\n${body}\n`;
+}
+
+// ---------------------------------------------------------------------------
+// HTML & PDF tables
+// ---------------------------------------------------------------------------
+
+function tableToHtml({ headers, rows }: { headers: string[]; rows: Row[] }, title: string): string {
+  const body = headers.length === 0
+    ? '<p>Nenhum dado encontrado.</p>'
+    : `<table>
+    <thead><tr>${headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+    <tbody>
+${rows.map(r => `      <tr>${headers.map(h => `<td>${escapeHtml(cellToString(r[h]))}</td>`).join('')}</tr>`).join('\n')}
+    </tbody>
+  </table>`;
+
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; padding: 2rem; background: #f8fafc; color: #1e293b; }
+    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
+    .wrap { overflow-x: auto; }
+    table { border-collapse: collapse; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-width: 100%; }
+    th, td { padding: 8px 12px; border: 1px solid #e2e8f0; text-align: left; vertical-align: top; white-space: pre-wrap; }
+    th { background: #f1f5f9; font-weight: 600; position: sticky; top: 0; }
+    tr:nth-child(even) td { background: #f8fafc; }
+  </style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <div class="wrap">
+  ${body}
+  </div>
+</body>
+</html>`;
+}
+
+function generateTablePdf({ headers, rows }: { headers: string[]; rows: Row[] }, title: string, options: ConversionOptions): Blob {
+  if (headers.length === 0) {
+    const doc = new jsPDF({ unit: 'pt', format: options.pdfPageSize || 'a4' });
     doc.text('Nenhum dado tabular para exibir.', 40, 50);
     return doc.output('blob');
   }
 
-  const headers = Object.keys(rows[0] || {});
-  const isLandscape = options.pdfOrientation ? options.pdfOrientation === 'landscape' : headers.length > 4;
+  const isLandscape = headers.length > 4 ? true : options.pdfOrientation === 'landscape';
   const doc = new jsPDF({
     orientation: isLandscape ? 'landscape' : 'portrait',
     unit: 'pt',
-    format: options.pdfPageSize || 'a4'
+    format: options.pdfPageSize || 'a4',
   });
 
   const margin = options.pdfMargin ?? 30;
@@ -162,224 +514,83 @@ function generateTablePdf(data: any, title: string, options: ConversionOptions):
   const pageHeight = doc.internal.pageSize.getHeight();
   const availableWidth = pageWidth - margin * 2;
 
-  const colWidth = Math.max(availableWidth / Math.max(headers.length, 1), 40);
+  // Shrink font when there are many columns so everything fits on the page
+  const fontSize = Math.max(5, Math.min(8, (availableWidth / headers.length) / 6));
+  const rowH = fontSize * 2;
+  const pad = 3;
 
-  let y = margin + 25;
+  // Column widths proportional to content length
+  const sampleRows = rows.slice(0, 300);
+  const weights = headers.map(h =>
+    Math.min(40, Math.max(4, h.length, ...sampleRows.map(r => cellToString(r[h]).length)))
+  );
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const colWidths = weights.map(w => (w / totalWeight) * availableWidth);
+  const colX: number[] = [];
+  colWidths.reduce((x, w, i) => ((colX[i] = x), x + w), margin);
+
+  const fit = (raw: string, width: number) => {
+    let text = toPdfSafeText(raw.replace(/\s+/g, ' '));
+    const max = width - pad * 2;
+    if (doc.getTextWidth(text) <= max) return text;
+    while (text.length > 1 && doc.getTextWidth(text + '...') > max) text = text.slice(0, -1);
+    return text + '...';
+  };
+
+  let y = margin + 20;
   let pageNum = 1;
 
   const drawFooter = (p: number) => {
-    doc.setFont('Helvetica', 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(148, 163, 184);
-    doc.text(`Página ${p}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
+    doc.text(`Página ${p}`,pageWidth / 2, pageHeight - 15, { align: 'center' });
   };
 
   const drawHeader = () => {
-    doc.setFillColor(30, 41, 59); // slate-800
-    doc.rect(margin, y, availableWidth, 20, 'F');
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(8);
+    doc.setFillColor(30, 41, 59);
+    doc.rect(margin, y, availableWidth, rowH + 2, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(fontSize);
     doc.setTextColor(255, 255, 255);
-
-    headers.forEach((h, idx) => {
-      const x = margin + idx * colWidth + 4;
-      const text = String(h);
-      doc.text(text.substring(0, Math.floor(colWidth / 5.5)), x, y + 13);
-    });
-    y += 20;
+    headers.forEach((h, idx) => doc.text(fit(h, colWidths[idx]), colX[idx] + pad, y + rowH * 0.7));
+    y += rowH + 2;
   };
 
-  // Title
-  doc.setFont('Helvetica', 'bold');
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(14);
   doc.setTextColor(15, 23, 42);
-  doc.text(title, margin, y);
-  y += 18;
-
+  doc.text(toPdfSafeText(title), margin, y);
+  y += 14;
   drawHeader();
 
   for (let r = 0; r < rows.length; r++) {
-    if (y > pageHeight - margin - 30) {
+    if (y + rowH > pageHeight - margin - 20) {
       drawFooter(pageNum);
       doc.addPage();
       pageNum++;
-      y = margin + 20;
+      y = margin;
       drawHeader();
     }
-
     const row = rows[r];
-    const isEven = r % 2 === 0;
-    doc.setFillColor(isEven ? 248 : 255, isEven ? 250 : 255, isEven ? 252 : 255);
-    doc.rect(margin, y, availableWidth, 16, 'F');
-
-    // Bottom row line
+    if (r % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(margin, y, availableWidth, rowH, 'F');
+    }
     doc.setDrawColor(226, 232, 240);
     doc.setLineWidth(0.5);
-    doc.line(margin, y + 16, margin + availableWidth, y + 16);
+    doc.line(margin, y + rowH, margin + availableWidth, y + rowH);
 
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(7.5);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(fontSize);
     doc.setTextColor(51, 65, 85);
-
     headers.forEach((h, idx) => {
-      const x = margin + idx * colWidth + 4;
-      const val = row[h] !== null && row[h] !== undefined ? String(row[h]) : '';
-      doc.text(val.substring(0, Math.floor(colWidth / 5)), x, y + 11);
+      const val = cellToString(row[h]);
+      if (val) doc.text(fit(val, colWidths[idx]), colX[idx] + pad, y + rowH * 0.68);
     });
-
-    y += 16;
+    y += rowH;
   }
 
   drawFooter(pageNum);
   return doc.output('blob');
-}
-
-// Parse CSV text to array of objects
-function parseCsvToObjects(csvText: string, delimiter: string = ','): any[] {
-  const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
-  if (lines.length === 0) return [];
-
-  const headers = splitCsvLine(lines[0], delimiter);
-  const result: any[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const values = splitCsvLine(lines[i], delimiter);
-    const obj: Record<string, any> = {};
-    headers.forEach((header, idx) => {
-      obj[header.trim()] = values[idx] !== undefined ? values[idx] : '';
-    });
-    result.push(obj);
-  }
-
-  return result;
-}
-
-function splitCsvLine(line: string, delimiter: string): string[] {
-  const pattern = new RegExp(
-    '(\\' + delimiter + '|\\r?\\n|\\r|^)' +
-    '(?:"([^"]*(?:""[^"]*)*)"|([^"\\' + delimiter + '\\r\\n]*))',
-    'gi'
-  );
-  const result: string[] = [];
-  let match: RegExpExecArray | null = null;
-  while ((match = pattern.exec(line)) !== null) {
-    if (match.index === pattern.lastIndex) {
-      pattern.lastIndex++;
-    }
-    const matchedValue = match[2] ? match[2].replace(/""/g, '"') : match[3];
-    result.push(matchedValue ?? '');
-  }
-  return result;
-}
-
-// Convert objects to CSV string
-function objectsToCsv(data: any, delimiter: string = ','): string {
-  const rows = Array.isArray(data) ? data : [data];
-  if (rows.length === 0) return '';
-
-  const headers = Object.keys(rows[0] || {});
-  const escapeCsv = (val: any) => {
-    if (val === null || val === undefined) return '';
-    const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
-    if (str.includes(delimiter) || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return str;
-  };
-
-  const csvRows = [headers.map(escapeCsv).join(delimiter)];
-  for (const row of rows) {
-    const rowValues = headers.map(h => escapeCsv(row[h]));
-    csvRows.push(rowValues.join(delimiter));
-  }
-  return csvRows.join('\r\n');
-}
-
-// Convert XML string to JSON
-function parseXmlToJson(xmlText: string): any {
-  const parser = new DOMParser();
-  const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
-  const parseNode = (node: Node): any => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.nodeValue?.trim() || '';
-    }
-    const obj: any = {};
-    if (node.childNodes && node.childNodes.length > 0) {
-      for (let i = 0; i < node.childNodes.length; i++) {
-        const child = node.childNodes[i];
-        if (child.nodeType === Node.ELEMENT_NODE) {
-          const childName = child.nodeName;
-          const childValue = parseNode(child);
-          if (obj[childName]) {
-            if (!Array.isArray(obj[childName])) {
-              obj[childName] = [obj[childName]];
-            }
-            obj[childName].push(childValue);
-          } else {
-            obj[childName] = childValue;
-          }
-        }
-      }
-    }
-    return obj;
-  };
-  return parseNode(xmlDoc.documentElement);
-}
-
-// Convert JSON object to XML string
-function jsonToXml(obj: any, rootName: string = 'root'): string {
-  const buildXml = (data: any, name: string): string => {
-    if (data === null || data === undefined) return `<${name}/>`;
-    if (typeof data !== 'object') {
-      const escaped = String(data)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-      return `<${name}>${escaped}</${name}>`;
-    }
-    if (Array.isArray(data)) {
-      return data.map(item => buildXml(item, 'item')).join('\n');
-    }
-    let inner = '';
-    for (const key of Object.keys(data)) {
-      const validTag = key.replace(/[^a-zA-Z0-9_-]/g, '_');
-      inner += buildXml(data[key], validTag) + '\n';
-    }
-    return `<${name}>\n${inner}</${name}>`;
-  };
-
-  return `<?xml version="1.0" encoding="UTF-8"?>\n${buildXml(obj, rootName)}`;
-}
-
-// Convert objects to styled HTML Table
-function objectsToHtmlTable(data: any, title: string): string {
-  const rows = Array.isArray(data) ? data : [data];
-  if (rows.length === 0) return `<!DOCTYPE html><html><body><p>Nenhum dado encontrado.</p></body></html>`;
-
-  const headers = Object.keys(rows[0] || {});
-  const thead = headers.map(h => `<th style="padding: 12px; border: 1px solid #e2e8f0; background: #f8fafc; font-weight: 600;">${h}</th>`).join('');
-  const tbody = rows.map(r => {
-    const cells = headers.map(h => `<td style="padding: 10px; border: 1px solid #e2e8f0;">${r[h] ?? ''}</td>`).join('');
-    return `<tr>${cells}</tr>`;
-  }).join('');
-
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>${title}</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; padding: 2rem; background: #f8fafc; color: #1e293b; }
-    h1 { font-size: 1.5rem; margin-bottom: 1rem; }
-    table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-  </style>
-</head>
-<body>
-  <h1>${title}</h1>
-  <table>
-    <thead><tr>${thead}</tr></thead>
-    <tbody>${tbody}</tbody>
-  </table>
-</body>
-</html>`;
 }

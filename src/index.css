@@ -1,24 +1,120 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    @apply bg-slate-950 text-slate-100 font-sans antialiased min-h-screen selection:bg-indigo-500 selection:text-white;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+/*
+  OmniConvert design tokens
+  - Tinta  #0F1B2D  page background (slate-950)
+  - Folha  #16243A  surfaces (slate-900)
+  - Fio    #263852  lines (slate-800)
+  - Papel  #E9EDF3  text (slate-100)
+  - Cobalto #3B63F0 actions (indigo-600)
+  - Marca-texto #F4C247 used once: the hero conversion
+  Existing components use slate/indigo classes, so remapping the scales
+  re-themes the whole app consistently.
+*/
+@theme {
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bricolage Grotesque", "Instrument Sans", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  --color-slate-50: #f5f7fa;
+  --color-slate-100: #e9edf3;
+  --color-slate-200: #d3d9e3;
+  --color-slate-300: #b7c1d1;
+  --color-slate-400: #8e9bb1;
+  --color-slate-500: #6d7f9e;
+  --color-slate-600: #4a5f82;
+  --color-slate-700: #34496a;
+  --color-slate-800: #263852;
+  --color-slate-850: #1d2e47;
+  --color-slate-900: #16243a;
+  --color-slate-950: #0f1b2d;
+
+  --color-indigo-50: #f0f3fe;
+  --color-indigo-100: #dfe6fd;
+  --color-indigo-200: #c3cffb;
+  --color-indigo-300: #98aef8;
+  --color-indigo-400: #7592f6;
+  --color-indigo-500: #5577f3;
+  --color-indigo-600: #3b63f0;
+  --color-indigo-700: #2c4ed0;
+  --color-indigo-800: #2440a8;
+  --color-indigo-900: #1f3680;
+  --color-indigo-950: #152350;
+
+  --color-highlight: #f4c247;
+  --color-ink: #0f1b2d;
+
+  --animate-fade-in: fade-in 240ms ease-out both;
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: none; }
   }
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-100 font-sans antialiased min-h-screen;
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  h1, h2, h3 {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  ::selection {
+    background: var(--color-highlight);
+    color: var(--color-ink);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-indigo-400);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  kbd {
+    font-family: var(--font-mono);
+  }
 }
-::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+
+/* The hero conversion: extension pair that swaps in place */
+.ext-swap {
+  display: inline-block;
+  animation: ext-swap 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }
+
+@keyframes ext-swap {
+  from { opacity: 0; transform: translateY(0.35em); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--color-slate-950); }
 ::-webkit-scrollbar-thumb {
-  background: rgba(99, 102, 241, 0.4);
-  border-radius: 4px;
+  background: var(--color-slate-700);
+  border-radius: 8px;
+  border: 2px solid var(--color-slate-950);
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.7);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--color-slate-600); }

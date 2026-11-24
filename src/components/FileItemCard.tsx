@@ -56,28 +56,30 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
     : null;
 
   return (
-    <div className={`rounded-2xl border transition-all p-4 sm:p-5 ${
+    <div className={`rounded-xl border border-l-4 transition-colors p-4 sm:p-5 bg-slate-900 ${
       item.status === 'success'
-        ? 'border-emerald-500/30 bg-slate-900/90 shadow-lg shadow-emerald-500/5'
+        ? 'border-slate-800 border-l-emerald-400'
         : item.status === 'error'
-        ? 'border-rose-500/30 bg-slate-900/90'
+        ? 'border-slate-800 border-l-rose-400'
         : item.status === 'converting'
-        ? 'border-indigo-500/40 bg-slate-900/90 shadow-lg shadow-indigo-500/10'
-        : 'border-slate-800 bg-slate-900/60 hover:bg-slate-900/80 hover:border-slate-700'
+        ? 'border-slate-800 border-l-indigo-400'
+        : 'border-slate-800 border-l-slate-700'
     }`}>
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         
         {/* Left: Thumbnail & File Info */}
         <div className="flex items-center gap-3.5 min-w-0 max-w-full lg:max-w-md">
           {item.previewUrl ? (
-            <div 
-              onClick={() => onOpenPreview(item)} 
-              className="w-12 h-12 rounded-xl overflow-hidden bg-slate-800 flex-shrink-0 cursor-pointer border border-slate-700 hover:opacity-80 transition-opacity"
+            <button
+              type="button"
+              onClick={() => onOpenPreview(item)}
+              aria-label={`Visualizar ${item.name}`}
+              className="w-12 h-12 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0 cursor-pointer border border-slate-700 hover:opacity-80 transition-opacity"
             >
-              <img src={item.previewUrl} alt={item.name} className="w-full h-full object-cover" />
-            </div>
+              <img src={item.previewUrl} alt="" className="w-full h-full object-cover" />
+            </button>
           ) : (
-            <div className="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700/80 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-lg bg-slate-800 border border-slate-700/80 flex items-center justify-center flex-shrink-0">
               {getCategoryIcon(item.category)}
             </div>
           )}
@@ -87,8 +89,8 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
               <span className="font-semibold text-sm text-slate-100 truncate" title={item.name}>
                 {item.name}
               </span>
-              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border ${getBadgeColor(item.category)}`}>
-                {item.extension.toUpperCase() || 'ARQUIVO'}
+              <span className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded border ${getBadgeColor(item.category)}`}>
+                .{item.extension || '?'}
               </span>
             </div>
             
@@ -96,8 +98,8 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
               <span>{formatBytes(item.size)}</span>
               {item.status === 'success' && item.resultSize && (
                 <>
-                  <span>•</span>
-                  <span className="text-emerald-400 font-medium">Novo: {formatBytes(item.resultSize)}</span>
+                  <ArrowRight className="w-3 h-3 text-slate-500" aria-hidden="true" />
+                  <span className="text-emerald-300 font-medium">{formatBytes(item.resultSize)}</span>
                   {sizeDiff !== null && (
                     <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
                       sizeDiff <= 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'
@@ -113,15 +115,16 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
 
         {/* Center: Conversion Format Selector */}
         <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap w-full lg:w-auto">
-          <div className="flex items-center gap-2 bg-slate-950/70 border border-slate-800 rounded-xl px-3 py-1.5">
-            <span className="text-xs text-slate-400 uppercase font-mono">{item.extension || 'orig.'}</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-500" />
-            
+          <div className="flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 focus-within:border-indigo-400">
+            <span className="text-xs text-slate-400 font-mono">.{item.extension || '?'}</span>
+            <ArrowRight className="w-3.5 h-3.5 text-slate-500" aria-hidden="true" />
+
             <select
               value={item.targetFormat}
               disabled={item.status === 'converting'}
               onChange={(e) => onUpdateTarget(item.id, e.target.value)}
-              className="bg-transparent text-indigo-300 font-semibold text-sm outline-none cursor-pointer focus:ring-0"
+              aria-label={`Formato de destino para ${item.name}`}
+              className="bg-transparent text-indigo-200 font-semibold text-sm outline-none cursor-pointer focus:ring-0"
             >
               {compatibleTargets.map((opt) => (
                 <option key={opt.extension} value={opt.extension} className="bg-slate-900 text-slate-100">
@@ -135,8 +138,9 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
           <button
             type="button"
             onClick={() => onOpenSettings(item)}
-            title="Configurações de conversão (qualidade, tamanho, layout)"
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+            title="Ajustes de conversão (qualidade, tamanho, layout)"
+            aria-label="Ajustes de conversão"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
           >
             <Settings2 className="w-4 h-4" />
           </button>
@@ -146,7 +150,8 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
             type="button"
             onClick={() => onOpenPreview(item)}
             title="Visualizar arquivo"
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+            aria-label="Visualizar arquivo"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -158,7 +163,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
             <button
               type="button"
               onClick={() => onConvert(item.id)}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-semibold shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5"
+              className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold transition-colors flex items-center gap-1.5"
             >
               Converter
             </button>
@@ -180,7 +185,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
               <button
                 type="button"
                 onClick={() => onDownload(item.id)}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white text-xs font-semibold shadow-md shadow-emerald-600/30 transition-all flex items-center gap-1.5"
+                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors flex items-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
                 Baixar
@@ -199,7 +204,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
                 onClick={() => onConvert(item.id)}
                 className="px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-xs font-medium transition-colors"
               >
-                Tentar Novamente
+                Tentar de novo
               </button>
             </div>
           )}
@@ -209,7 +214,8 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
             type="button"
             onClick={() => onRemove(item.id)}
             title="Remover da lista"
-            className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+            aria-label={`Remover ${item.name} da lista`}
+            className="p-2 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
           </button>
@@ -218,9 +224,9 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
 
       {/* Error message detailed */}
       {item.status === 'error' && item.errorMessage && (
-        <div className="mt-3 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-          <strong>Falha na conversão:</strong> {item.errorMessage}
-        </div>
+        <p role="alert" className="mt-3 px-3 py-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-200 text-sm">
+          {item.errorMessage}
+        </p>
       )}
     </div>
   );
