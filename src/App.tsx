@@ -19,10 +19,30 @@ import { convertSingleFile } from './converters';
 import { packageToZip } from './converters/archiveConverter';
 import { getCompatibleTargets } from './constants/formats';
 import { ConversionHero } from './components/ConversionHero';
+import { FinanceView } from './components/finance/FinanceView';
+import { ToolsView } from './components/tools/ToolsView';
 import { Sparkles, FileCode, FileSpreadsheet, Image as ImageIcon, ArrowLeftRight, FileText, Video } from 'lucide-react';
 
+const VIEW_KEY = 'omnithings.view';
+const VIEWS: AppViewMode[] = ['finance', 'converter', 'pdf', 'media', 'tools'];
+
+function initialView(): AppViewMode {
+  try {
+    const saved = localStorage.getItem(VIEW_KEY) as AppViewMode | null;
+    if (saved && VIEWS.includes(saved)) return saved;
+  } catch {
+    // storage blocked: fall through
+  }
+  return 'finance';
+}
+
 export function App() {
-  const [currentView, setCurrentView] = useState<AppViewMode>('converter');
+  const [currentView, setCurrentViewState] = useState<AppViewMode>(initialView);
+  const setCurrentView = useCallback((view: AppViewMode) => {
+    setCurrentViewState(view);
+    try { localStorage.setItem(VIEW_KEY, view); } catch { /* ignore */ }
+    window.scrollTo({ top: 0 });
+  }, []);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isConvertingAll, setIsConvertingAll] = useState(false);
   const [settingsItem, setSettingsItem] = useState<FileItem | null>(null);
@@ -176,7 +196,7 @@ export function App() {
       handleFilesSelected([file]);
     } else if (type === 'json') {
       const jsonData = JSON.stringify({
-        sistema: "OmniConvert",
+        sistema: "OmniThings",
         versao: "2.0.0",
         recursos: ["Imagens", "Tabelas", "Documentos", "Áudio", "ZIP"],
         ativo: true
@@ -184,14 +204,14 @@ export function App() {
       const file = new File([jsonData], 'configuracao.json', { type: 'application/json' });
       handleFilesSelected([file]);
     } else if (type === 'markdown') {
-      const mdData = `# Relatório de Demonstração\n\nEste documento foi gerado para testar o **OmniConvert**.\n\n## Recursos Suportados\n- Conversão para HTML\n- Conversão para PDF\n- Exportação para TXT\n`;
+      const mdData = `# Relatório de Demonstração\n\nEste documento foi gerado para testar o **OmniThings**.\n\n## Recursos Suportados\n- Conversão para HTML\n- Conversão para PDF\n- Exportação para TXT\n`;
       const file = new File([mdData], 'documento_exemplo.md', { type: 'text/markdown' });
       handleFilesSelected([file]);
     } else if (type === 'image') {
       const svgData = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
   <rect width="400" height="400" rx="30" fill="#4f46e5" />
   <circle cx="200" cy="200" r="90" fill="#ffffff" opacity="0.9" />
-  <text x="200" y="210" font-family="sans-serif" font-size="24" font-weight="bold" fill="#1e1b4b" text-anchor="middle">OmniConvert</text>
+  <text x="200" y="210" font-family="sans-serif" font-size="24" font-weight="bold" fill="#1e1b4b" text-anchor="middle">OmniThings</text>
 </svg>`;
       const file = new File([svgData], 'grafico_vetorial.svg', { type: 'image/svg+xml' });
       handleFilesSelected([file]);
@@ -203,6 +223,18 @@ export function App() {
       <Header currentView={currentView} onSelectView={setCurrentView} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-10">
+
+        {currentView === 'finance' && (
+          <div className="animate-fade-in">
+            <FinanceView />
+          </div>
+        )}
+
+        {currentView === 'tools' && (
+          <div className="animate-fade-in">
+            <ToolsView />
+          </div>
+        )}
 
         {/* MODE 1: Universal Converter */}
         {currentView === 'converter' && (

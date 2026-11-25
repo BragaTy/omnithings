@@ -86,7 +86,17 @@ export const BatchActionBar: React.FC<BatchActionBarProps> = ({
             )}
             {firstCategory === 'audio' && (
               <>
+                <option value="mp3">MP3</option>
+                <option value="m4a">M4A (AAC)</option>
+                <option value="ogg">OGG (Opus)</option>
                 <option value="wav">WAV (Estúdio)</option>
+              </>
+            )}
+            {firstCategory === 'video' && (
+              <>
+                <option value="mp4">MP4</option>
+                <option value="webm">WebM</option>
+                <option value="mp3">MP3 (só o áudio)</option>
               </>
             )}
             <option value="zip">ZIP (Compactar)</option>

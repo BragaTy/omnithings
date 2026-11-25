@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /*
-  OmniConvert design tokens
+  OmniThings design tokens
   - Tinta  #0F1B2D  page background (slate-950)
   - Folha  #16243A  surfaces (slate-900)
   - Fio    #263852  lines (slate-800)
@@ -43,6 +43,10 @@
 
   --color-highlight: #f4c247;
   --color-ink: #0f1b2d;
+
+  /* Chart series (validated on the #16243A surface: CVD ΔE 26.8, contrast ≥ 3:1) */
+  --color-series-in: #3987e5;
+  --color-series-out: #d95926;
 
   --animate-fade-in: fade-in 240ms ease-out both;
 

@@ -1,4 +1,4 @@
-# 🚀 OmniConvert Studio
+# OmniThings
 
 <p align="center">
   <a href="https://bragaty.github.io/omniconvert/" target="_blank">
@@ -13,17 +13,24 @@
   <img src="https://img.shields.io/badge/Privacidade-Zero%20Servidor-orange?style=for-the-badge" alt="Privacidade" />
 </p>
 
-> **A alternativa definitiva, gratuita e de código aberto ao Convertio e iLovePDF — processamento 100% no seu navegador!**
-> 
-> 🌐 **Experimente agora mesmo sem instalar nada**: [https://bragaty.github.io/omniconvert/](https://bragaty.github.io/omniconvert/)
+> **Finanças pessoais, conversores e utilitários que rodam 100% no seu navegador.**
+>
+> 🌐 [https://bragaty.github.io/omniconvert/](https://bragaty.github.io/omniconvert/)
+
+## O que tem
+
+- **Finanças**: importe extratos (CSV, OFX, Excel) e faturas de cartão dos bancos brasileiros e veja gastos por categoria, metas mensais, entradas × saídas por mês e as contas fixas e assinaturas detectadas automaticamente. Os dados ficam só no `localStorage` do navegador.
+- **Converter**: imagens, documentos (DOCX → PDF mantém as imagens), planilhas, dados, **vídeo** (MP4, WebM, MKV, MOV) e **áudio** (MP3, M4A, OGG, WAV) via WebCodecs.
+- **Ferramentas PDF** e **Vídeo e áudio**: juntar, dividir, comprimir, cortar, gravar tela etc.
+- **Utilitários**: gerador de senha, CPF/CNPJ (gerar e validar), QR Code Pix, gerador de nicks, links de WhatsApp/Telegram, letras diferentes, contador de texto, remover HTML, cifra de César, hash MD5/SHA, unidades de medida e bases numéricas.
 
 ---
 
-## 🎯 Por que o OmniConvert é diferente?
+## 🎯 Por que roda no navegador?
 
 A maioria dos conversores online (Convertio, iLovePDF, CloudConvert) envia seus documentos e vídeos para servidores remotos, com limites de 2 arquivos por dia, filas de espera e planos pagos.
 
-O **OmniConvert Studio** faz o processamento **diretamente na memória RAM do seu dispositivo** via **WebAssembly**, **HTML5 Canvas**, **pdf-lib** e **Web Audio API**:
+O **OmniThings** faz o processamento **diretamente na memória RAM do seu dispositivo** via **WebAssembly**, **HTML5 Canvas**, **pdf-lib** e **Web Audio API**:
 - 🔒 **Privacidade Absoluta**: Seus dados nunca saem da sua máquina.
 - ⚡ **Sem Fila nem Limites**: Converta quantos arquivos quiser sem gastar créditos.
 - 🗜️ **Download em Lote (.ZIP)**: Converta dezenas de arquivos e baixe tudo empacotado com 1 clique.

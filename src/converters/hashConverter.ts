@@ -30,7 +30,7 @@ ${sha256Hash}
 SHA-1:
 ${sha1Hash}
 ================================================
-Gerado por Conversor Universal de Arquivos
+Gerado por OmniThings
 `;
 
   const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });

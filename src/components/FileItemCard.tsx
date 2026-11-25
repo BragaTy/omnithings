@@ -1,6 +1,6 @@
 import React from 'react';
 import { 
-  FileText, Image as ImageIcon, FileSpreadsheet, Music, Archive, FileQuestion, 
+  FileText, Image as ImageIcon, FileSpreadsheet, Music, Archive, FileQuestion, Film,
   ArrowRight, Settings2, Download, Trash2, Eye, CheckCircle2, AlertCircle, Loader2 
 } from 'lucide-react';
 import { FileItem, FileCategory } from '../types';
@@ -34,6 +34,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
       case 'data': return <FileSpreadsheet className="w-5 h-5 text-emerald-400" />;
       case 'document': return <FileText className="w-5 h-5 text-sky-400" />;
       case 'audio': return <Music className="w-5 h-5 text-purple-400" />;
+      case 'video': return <Film className="w-5 h-5 text-orange-400" />;
       case 'archive': return <Archive className="w-5 h-5 text-amber-400" />;
       default: return <FileQuestion className="w-5 h-5 text-slate-400" />;
     }
@@ -45,6 +46,7 @@ export const FileItemCard: React.FC<FileItemCardProps> = ({
       case 'data': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'document': return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
       case 'audio': return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+      case 'video': return 'bg-orange-500/10 text-orange-300 border-orange-500/20';
       case 'archive': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
       default: return 'bg-slate-800 text-slate-400 border-slate-700';
     }

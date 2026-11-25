@@ -44,6 +44,8 @@ export interface StructuredParagraph {
   listLevel?: number;
   isCode?: boolean;
   table?: string[][];
+  /** Embedded picture; width/height in points (1/72 inch) */
+  image?: { dataUrl: string; width: number; height: number; format: 'PNG' | 'JPEG' };
 }
 
 export interface PdfLine {
@@ -435,7 +437,76 @@ export async function extractDocxContent(file: File): Promise<ExtractedDocument>
   const body = xmlDoc.getElementsByTagName('w:body')[0];
   if (!body) throw new Error('Documento Word inválido ou corrompido.');
 
+  // Relationship id -> file inside the zip (images live in word/media/)
+  const rels = new Map<string, string>();
+  const docDir = (docXmlFile.name.includes('/') ? docXmlFile.name.slice(0, docXmlFile.name.lastIndexOf('/') + 1) : '');
+  const relsFile = zip.file(`${docDir}_rels/${docXmlFile.name.slice(docDir.length)}.rels`);
+  if (relsFile) {
+    const relsDoc = parser.parseFromString(await relsFile.async('text'), 'application/xml');
+    const relEls = relsDoc.getElementsByTagName('Relationship');
+    for (let i = 0; i < relEls.length; i++) {
+      const id = relEls[i].getAttribute('Id');
+      const target = relEls[i].getAttribute('Target');
+      if (!id || !target || relEls[i].getAttribute('TargetMode') === 'External') continue;
+      rels.set(id, resolveZipPath(docDir, target));
+    }
+  }
+
   const paragraphs: StructuredParagraph[] = [];
+  // Image placeholders resolved asynchronously after the walk
+  const pendingImages: { block: StructuredParagraph; path: string; widthPt: number; heightPt: number }[] = [];
+
+  const collectImages = (p: Element) => {
+    const found: { rId: string; el: Element }[] = [];
+    const blips = p.getElementsByTagName('a:blip');
+    for (let i = 0; i < blips.length; i++) {
+      const rId = blips[i].getAttribute('r:embed');
+      if (rId) found.push({ rId, el: blips[i] });
+    }
+    const vml = p.getElementsByTagName('v:imagedata');
+    for (let i = 0; i < vml.length; i++) {
+      const rId = vml[i].getAttribute('r:id');
+      if (rId) found.push({ rId, el: vml[i] });
+    }
+    for (const { rId, el } of found) {
+      // The same picture is usually present twice (mc:Choice + mc:Fallback); keep only one
+      let ancestor: Element | null = el.parentElement;
+      let inFallback = false;
+      let container: Element | null = null;
+      while (ancestor && ancestor !== p) {
+        if (ancestor.nodeName === 'mc:Fallback') inFallback = true;
+        if (!container && (ancestor.nodeName === 'wp:inline' || ancestor.nodeName === 'wp:anchor')) container = ancestor;
+        ancestor = ancestor.parentElement;
+      }
+      if (inFallback) continue;
+      const path = rels.get(rId);
+      if (!path) continue;
+
+      // Size: DrawingML extent is in EMU (12700 per point); VML uses CSS style
+      let widthPt = 0;
+      let heightPt = 0;
+      const extent = container?.getElementsByTagName('wp:extent')[0];
+      if (extent) {
+        widthPt = parseInt(extent.getAttribute('cx') || '0', 10) / 12700;
+        heightPt = parseInt(extent.getAttribute('cy') || '0', 10) / 12700;
+      } else {
+        const style = el.parentElement?.getAttribute('style') || '';
+        const toPt = (v?: string) => {
+          if (!v) return 0;
+          const n = parseFloat(v);
+          if (v.endsWith('in')) return n * 72;
+          if (v.endsWith('cm')) return (n * 72) / 2.54;
+          if (v.endsWith('px')) return n * 0.75;
+          return n;
+        };
+        widthPt = toPt(style.match(/width:\s*([\d.]+\w*)/)?.[1]);
+        heightPt = toPt(style.match(/height:\s*([\d.]+\w*)/)?.[1]);
+      }
+      const block: StructuredParagraph = { text: '' };
+      pendingImages.push({ block, path, widthPt, heightPt });
+      paragraphs.push(block);
+    }
+  };
 
   const collectRuns = (node: Element, runs: TextRunInfo[], fmt: { bold?: boolean; italic?: boolean }) => {
     for (const child of Array.from(node.children)) {
@@ -550,6 +621,7 @@ export async function extractDocxContent(file: File): Promise<ExtractedDocument>
         case 'w:p': {
           const p = readParagraph(child);
           if (p) paragraphs.push(p);
+          collectImages(child);
           break;
         }
         case 'w:tbl': {
@@ -570,7 +642,75 @@ export async function extractDocxContent(file: File): Promise<ExtractedDocument>
   };
 
   walkBlocks(body);
-  return { paragraphs, fullText: structureToPlainText(paragraphs) };
+
+  // Load the pictures; drop the ones the browser can't render (EMF/WMF/TIFF)
+  for (const pending of pendingImages) {
+    const file = zip.file(pending.path);
+    if (!file) continue;
+    try {
+      const img = await loadDocImage(await file.async('uint8array'), pending.path);
+      const widthPt = pending.widthPt || img.naturalWidth * 0.75;
+      const heightPt = pending.heightPt || img.naturalHeight * 0.75;
+      pending.block.image = { dataUrl: img.dataUrl, format: img.format, width: widthPt, height: heightPt };
+    } catch {
+      // unsupported picture format: skip it
+    }
+  }
+  const withImages = paragraphs.filter(p => p.text || p.image || p.table);
+  return { paragraphs: withImages, fullText: structureToPlainText(withImages) };
+}
+
+function resolveZipPath(baseDir: string, target: string): string {
+  if (target.startsWith('/')) return target.slice(1);
+  const parts = (baseDir + target).split('/');
+  const out: string[] = [];
+  for (const part of parts) {
+    if (part === '..') out.pop();
+    else if (part && part !== '.') out.push(part);
+  }
+  return out.join('/');
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+/** Returns the picture as PNG or JPEG data URL (the formats jsPDF embeds natively). */
+async function loadDocImage(
+  bytes: Uint8Array,
+  path: string
+): Promise<{ dataUrl: string; format: 'PNG' | 'JPEG'; naturalWidth: number; naturalHeight: number }> {
+  const ext = getExtension(path);
+  const isPng = bytes[0] === 0x89 && bytes[1] === 0x50;
+  const isJpeg = bytes[0] === 0xff && bytes[1] === 0xd8;
+  if (['emf', 'wmf', 'tif', 'tiff'].includes(ext)) throw new Error('formato de imagem não suportado');
+
+  const mime = isPng ? 'image/png' : isJpeg ? 'image/jpeg' : ext === 'svg' ? 'image/svg+xml' : ext === 'gif' ? 'image/gif' : ext === 'bmp' ? 'image/bmp' : 'image/webp';
+  const sourceUrl = `data:${mime};base64,${bytesToBase64(bytes)}`;
+
+  const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const el = new Image();
+    el.onload = () => resolve(el);
+    el.onerror = () => reject(new Error('imagem inválida'));
+    el.src = sourceUrl;
+  });
+  const naturalWidth = img.naturalWidth || 400;
+  const naturalHeight = img.naturalHeight || 300;
+
+  if (isPng) return { dataUrl: sourceUrl, format: 'PNG', naturalWidth, naturalHeight };
+  if (isJpeg) return { dataUrl: sourceUrl, format: 'JPEG', naturalWidth, naturalHeight };
+
+  // GIF, BMP, WEBP, SVG -> PNG through a canvas
+  const canvas = document.createElement('canvas');
+  canvas.width = naturalWidth;
+  canvas.height = naturalHeight;
+  canvas.getContext('2d')!.drawImage(img, 0, 0, naturalWidth, naturalHeight);
+  return { dataUrl: canvas.toDataURL('image/png'), format: 'PNG', naturalWidth, naturalHeight };
 }
 
 function mergeRuns(runs: TextRunInfo[]): TextRunInfo[] {
@@ -1023,7 +1163,8 @@ function runsOf(p: StructuredParagraph): TextRunInfo[] {
   return p.runs && p.runs.length ? p.runs : [{ text: p.text }];
 }
 
-export function structureToPlainText(paragraphs: StructuredParagraph[]): string {
+export function structureToPlainText(allParagraphs: StructuredParagraph[]): string {
+  const paragraphs = allParagraphs.filter(p => !p.image);
   const out: string[] = [];
   paragraphs.forEach((p, i) => {
     let line: string;
@@ -1041,7 +1182,8 @@ function escapeMd(text: string): string {
   return text.replace(/([\\`*_[\]])/g, '\\$1').replace(/^(\s*)([#>+-]|\d+\.)(\s)/gm, '$1\\$2$3');
 }
 
-export function structureToMarkdown(paragraphs: StructuredParagraph[]): string {
+export function structureToMarkdown(allParagraphs: StructuredParagraph[]): string {
+  const paragraphs = allParagraphs.filter(p => !p.image);
   const inlineMd = (p: StructuredParagraph) =>
     runsOf(p)
       .map(r => {
@@ -1114,7 +1256,9 @@ export function structureToHtml(paragraphs: StructuredParagraph[]): string {
       continue;
     }
     closeListsTo(0);
-    if (p.table) {
+    if (p.image) {
+      out.push(`<p><img src="${p.image.dataUrl}" alt="" width="${Math.round(p.image.width / 0.75)}" style="max-width:100%;height:auto"></p>`);
+    } else if (p.table) {
       const [head, ...rest] = p.table;
       out.push(
         `<table>\n<thead><tr>${head.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>\n<tbody>\n` +
@@ -1184,6 +1328,7 @@ export async function buildDocxFromStructure(title: string, paragraphs: Structur
   const children: (Paragraph | Table)[] = [];
 
   for (const p of paragraphs) {
+    if (p.image) continue; // only DOCX inputs carry images, and DOCX -> DOCX is not offered
     if (p.table) {
       const cols = Math.max(...p.table.map(r => r.length));
       children.push(
@@ -1286,6 +1431,21 @@ export function buildPdfFromStructure(
   };
 
   for (const p of paragraphs) {
+    if (p.image) {
+      // Keep the size from Word, but never wider than the text column or taller than a page
+      const maxH = bottom - margin;
+      const scale = Math.min(1, contentWidth / p.image.width, maxH / p.image.height);
+      const w = p.image.width * scale;
+      const h = p.image.height * scale;
+      ensure(h + 6);
+      try {
+        doc.addImage(p.image.dataUrl, p.image.format, margin, y + 3, w, h, undefined, 'FAST');
+      } catch {
+        // corrupt picture: leave the space empty rather than failing the whole PDF
+      }
+      y += h + 10;
+      continue;
+    }
     if (p.table) {
       const cols = Math.max(...p.table.map(r => r.length));
       const colW = contentWidth / cols;

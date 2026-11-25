@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Image as ImageIcon, FileSpreadsheet, FileText, Music, Archive, ArrowRight } from 'lucide-react';
+import { Search, Image as ImageIcon, FileSpreadsheet, FileText, Music, Archive, ArrowRight, Film } from 'lucide-react';
 import { getCompatibleTargets } from '../constants/formats';
 import { FileCategory } from '../types';
 
@@ -13,6 +13,7 @@ export const CompatibilityMatrix: React.FC = () => {
     { id: 'data', label: 'Planilhas & Dados', icon: <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> },
     { id: 'document', label: 'Documentos & Texto', icon: <FileText className="w-3.5 h-3.5 text-sky-400" /> },
     { id: 'audio', label: 'Áudio', icon: <Music className="w-3.5 h-3.5 text-purple-400" /> },
+    { id: 'video', label: 'Vídeo', icon: <Film className="w-3.5 h-3.5 text-orange-400" /> },
     { id: 'archive', label: 'Arquivos & Hashes', icon: <Archive className="w-3.5 h-3.5 text-amber-400" /> },
   ];
 
@@ -31,6 +32,9 @@ export const CompatibilityMatrix: React.FC = () => {
     { ext: 'txt', cat: 'document' as FileCategory, name: 'Texto Puro (TXT)' },
     { ext: 'mp3', cat: 'audio' as FileCategory, name: 'Áudio MP3' },
     { ext: 'wav', cat: 'audio' as FileCategory, name: 'Áudio WAV' },
+    { ext: 'mp4', cat: 'video' as FileCategory, name: 'Vídeo MP4' },
+    { ext: 'webm', cat: 'video' as FileCategory, name: 'Vídeo WebM' },
+    { ext: 'mov', cat: 'video' as FileCategory, name: 'Vídeo MOV (iPhone)' },
     { ext: 'zip', cat: 'archive' as FileCategory, name: 'Arquivo ZIP' },
   ];
 

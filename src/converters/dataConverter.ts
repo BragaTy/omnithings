@@ -232,17 +232,27 @@ function flattenObject(obj: any, prefix = '', out: Row = {}): Row {
 // ---------------------------------------------------------------------------
 
 // Pick the delimiter that produces the most consistent column count
-function detectCsvDelimiter(text: string): string {
+export function detectCsvDelimiter(text: string): string {
   const sample = text.slice(0, 20000);
   const candidates = [',', ';', '\t', '|'];
   let best = ',';
   let bestScore = 0;
   for (const d of candidates) {
-    const rows = parseCsv(sample, d).slice(0, 20);
+    const rows = parseCsv(sample, d).slice(0, 30);
     if (rows.length === 0) continue;
-    const cols = rows[0].length;
+    // Use the most common column count, not the first row's: bank exports
+    // often start with a few title lines ("Extrato Conta Corrente")
+    const counts = new Map<number, number>();
+    rows.forEach(r => counts.set(r.length, (counts.get(r.length) || 0) + 1));
+    let cols = 0;
+    let consistent = 0;
+    counts.forEach((n, c) => {
+      if (c >= 2 && (n > consistent || (n === consistent && c > cols))) {
+        cols = c;
+        consistent = n;
+      }
+    });
     if (cols < 2) continue;
-    const consistent = rows.filter(r => r.length === cols).length;
     const score = consistent * cols;
     if (score > bestScore) {
       bestScore = score;

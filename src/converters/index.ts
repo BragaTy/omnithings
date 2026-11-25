@@ -3,6 +3,7 @@ import { convertImage } from './imageConverter';
 import { convertData } from './dataConverter';
 import { convertDocument } from './documentConverter';
 import { convertAudio } from './audioConverter';
+import { convertMedia } from './mediaConverter';
 import { packageToZip, extractZip } from './archiveConverter';
 import { convertToHash, convertToBase64 } from './hashConverter';
 
@@ -78,7 +79,15 @@ export async function convertSingleFile(
       break;
 
     case 'audio':
-      result = await convertAudio(file, target, options);
+      // WAV via Web Audio decodes almost anything (incl. WMA/AAC the OS supports);
+      // compressed targets go through the WebCodecs encoder
+      result = target === 'wav'
+        ? await convertAudio(file, target, options)
+        : await convertMedia(file, target, onProgress);
+      break;
+
+    case 'video':
+      result = await convertMedia(file, target, onProgress);
       break;
 
     default:

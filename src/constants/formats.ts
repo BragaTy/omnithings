@@ -38,6 +38,12 @@ export const ALL_FORMATS: Record<string, FormatOption> = {
   m4a: { extension: 'm4a', label: 'M4A', mimeType: 'audio/mp4', category: 'audio', description: 'Formato de áudio Apple MPEG-4' },
   flac: { extension: 'flac', label: 'FLAC', mimeType: 'audio/flac', category: 'audio', description: 'Áudio comprimido sem perdas (lossless)' },
 
+  // Video
+  mp4: { extension: 'mp4', label: 'MP4', mimeType: 'video/mp4', category: 'video', description: 'Vídeo universal, abre em qualquer aparelho' },
+  webm: { extension: 'webm', label: 'WebM', mimeType: 'video/webm', category: 'video', description: 'Vídeo leve para a web' },
+  mkv: { extension: 'mkv', label: 'MKV', mimeType: 'video/x-matroska', category: 'video', description: 'Contêiner Matroska' },
+  mov: { extension: 'mov', label: 'MOV', mimeType: 'video/quicktime', category: 'video', description: 'Vídeo QuickTime (Apple)' },
+
   // Archive
   zip: { extension: 'zip', label: 'ZIP', mimeType: 'application/zip', category: 'archive', description: 'Arquivo comprimido com múltiplos arquivos' },
   
@@ -51,20 +57,27 @@ export function detectCategory(extension: string, mimeType?: string): FileCatego
   const imageExts = ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'ico', 'svg', 'gif', 'tiff', 'tif', 'avif'];
   const docExts = ['pdf', 'txt', 'md', 'markdown', 'html', 'htm', 'rtf', 'docx', 'doc', 'odt'];
   const dataExts = ['csv', 'tsv', 'json', 'xlsx', 'xls', 'ods', 'xml', 'yaml', 'yml'];
+  const audioExts = ['mp3', 'wav', 'ogg', 'oga', 'opus', 'aac', 'm4a', 'flac', 'weba', 'wma'];
+  // "ts" is left out on purpose: it is far more often a TypeScript file
+  const videoExts = ['mp4', 'm4v', 'webm', 'mkv', 'mov', 'ogv', '3gp', 'avi', 'mts', 'm2ts'];
+  const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
 
   // Check extensions first: MIME types reported by the OS are often wrong
   // (e.g. .csv reported as "application/vnd.ms-excel", .ts as "video/mp2t")
+  if (videoExts.includes(ext)) return 'video';
+  if (audioExts.includes(ext)) return 'audio';
   if (imageExts.includes(ext)) return 'image';
   if (dataExts.includes(ext)) return 'data';
   if (docExts.includes(ext)) return 'document';
-  const audioExts = ['mp3', 'wav', 'ogg', 'aac', 'm4a', 'flac', 'weba', 'wma'];
-  const archiveExts = ['zip', 'rar', '7z', 'tar', 'gz'];
+  if (archiveExts.includes(ext)) return 'archive';
+  if (['ts', 'tsx', 'js', 'jsx', 'py', 'java', 'c', 'cpp', 'cs', 'go', 'rs'].includes(ext)) return 'document';
 
-  if (imageExts.includes(ext) || mimeType?.startsWith('image/')) return 'image';
-  if (dataExts.includes(ext) || mimeType?.includes('spreadsheet') || mimeType?.includes('json') || mimeType?.includes('csv')) return 'data';
-  if (docExts.includes(ext) || mimeType?.startsWith('text/') || mimeType?.includes('pdf')) return 'document';
-  if (audioExts.includes(ext) || mimeType?.startsWith('audio/')) return 'audio';
-  if (archiveExts.includes(ext) || mimeType?.includes('zip')) return 'archive';
+  if (mimeType?.startsWith('image/')) return 'image';
+  if (mimeType?.includes('spreadsheet') || mimeType?.includes('json') || mimeType?.includes('csv')) return 'data';
+  if (mimeType?.startsWith('text/') || mimeType?.includes('pdf')) return 'document';
+  if (mimeType?.startsWith('video/')) return 'video';
+  if (mimeType?.startsWith('audio/')) return 'audio';
+  if (mimeType?.includes('zip')) return 'archive';
 
   return 'other';
 }
@@ -140,11 +153,24 @@ export function getCompatibleTargets(ext: string, category: FileCategory): Forma
     }
 
     case 'audio': {
-      // Only WAV can actually be encoded in the browser without extra libraries
-      const candidates = ['wav'];
+      const candidates = ['mp3', 'm4a', 'ogg', 'wav'];
       candidates.forEach(c => {
         if (c !== cleanExt && ALL_FORMATS[c]) {
           targets.push(ALL_FORMATS[c]);
+        }
+      });
+      targets.push(ALL_FORMATS['zip']);
+      targets.push(ALL_FORMATS['hash']);
+      break;
+    }
+
+    case 'video': {
+      // Video formats first, then "extract audio" targets
+      const candidates = ['mp4', 'webm', 'mkv', 'mov', 'mp3', 'm4a', 'wav'];
+      candidates.forEach(c => {
+        if (c !== cleanExt && !(c === 'mp4' && cleanExt === 'm4v') && ALL_FORMATS[c]) {
+          const f = ALL_FORMATS[c];
+          targets.push(f.category === 'audio' ? { ...f, label: `${f.label} (só o áudio)` } : f);
         }
       });
       targets.push(ALL_FORMATS['zip']);

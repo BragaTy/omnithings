@@ -557,7 +557,7 @@ export async function protectPdf(file: File, userPassword: string): Promise<Blob
   const arrayBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
   pdfDoc.setTitle(`Protegido [Senha: ${userPassword}]`);
-  pdfDoc.setSubject('Documento Protegido por OmniConvert');
+  pdfDoc.setSubject('Documento Protegido por OmniThings');
   const bytes = await pdfDoc.save();
   return toPdfBlob(bytes);
 }
@@ -579,8 +579,8 @@ export async function organizePdf(file: File, newPageIndices: number[]): Promise
 export async function pdfToPdfA(file: File): Promise<Blob> {
   const arrayBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
-  pdfDoc.setProducer('OmniConvert PDF/A Archival Engine');
-  pdfDoc.setCreator('OmniConvert ISO 19005-1 Compliant');
+  pdfDoc.setProducer('OmniThings PDF/A Archival Engine');
+  pdfDoc.setCreator('OmniThings ISO 19005-1 Compliant');
   pdfDoc.setCreationDate(new Date());
   pdfDoc.setModificationDate(new Date());
   const bytes = await pdfDoc.save();

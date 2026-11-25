@@ -1,4 +1,4 @@
-export type FileCategory = 'image' | 'document' | 'data' | 'audio' | 'archive' | 'other';
+export type FileCategory = 'image' | 'document' | 'data' | 'audio' | 'video' | 'archive' | 'other';
 
 export interface FormatOption {
   extension: string;

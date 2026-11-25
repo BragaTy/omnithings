@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { UploadCloud, FileSpreadsheet, Image as ImageIcon, FileText, Music, Archive, Plus } from 'lucide-react';
+import { UploadCloud, FileSpreadsheet, Image as ImageIcon, FileText, Music, Archive, Plus, Film } from 'lucide-react';
 
 interface DropZoneProps {
   onFilesSelected: (files: File[]) => void;
@@ -93,6 +93,7 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesSelected, isCompact =
     { label: 'Documentos', icon: <FileText className="w-4 h-4 text-sky-300" />, exts: 'pdf docx doc odt rtf md html txt' },
     { label: 'Dados', icon: <FileSpreadsheet className="w-4 h-4 text-emerald-300" />, exts: 'csv xlsx xls json yaml xml' },
     { label: 'Áudio', icon: <Music className="w-4 h-4 text-purple-300" />, exts: 'mp3 wav ogg m4a flac' },
+    { label: 'Vídeo', icon: <Film className="w-4 h-4 text-orange-300" />, exts: 'mp4 webm mov mkv' },
     { label: 'Arquivos', icon: <Archive className="w-4 h-4 text-amber-300" />, exts: 'zip' },
   ];
 
@@ -146,7 +147,7 @@ export const DropZone: React.FC<DropZoneProps> = ({ onFilesSelected, isCompact =
         </span>
       </div>
 
-      <ul className="grid gap-x-8 gap-y-2 border-t border-slate-800 px-6 py-5 sm:px-10 sm:grid-cols-2 lg:grid-cols-5 text-sm">
+      <ul className="grid gap-x-8 gap-y-2 border-t border-slate-800 px-6 py-5 sm:px-10 sm:grid-cols-3 lg:grid-cols-6 text-sm">
         {groups.map(g => (
           <li key={g.label} className="flex items-start gap-2">
             <span className="mt-0.5" aria-hidden="true">{g.icon}</span>

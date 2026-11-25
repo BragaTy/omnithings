@@ -7,7 +7,9 @@ const PAIRS: [string, string][] = [
   ['png', 'webp'],
   ['json', 'yaml'],
   ['docx', 'pdf'],
+  ['mov', 'mp4'],
   ['md', 'html'],
+  ['mp4', 'mp3'],
   ['xml', 'csv'],
   ['jpg', 'ico'],
 ];
@@ -35,7 +37,7 @@ export const ConversionHero: React.FC<ConversionHeroProps> = ({ onTrySample }) =
           Solte o arquivo. Escolha o formato. Pronto.
         </h1>
         <p className="mt-5 text-slate-300 text-base sm:text-lg leading-relaxed max-w-[34rem]">
-          Imagens, PDFs, planilhas, documentos e áudio convertidos aqui mesmo no seu navegador.
+          Imagens, PDFs, planilhas, documentos, vídeos e áudio convertidos aqui mesmo no seu navegador.
           Nada é enviado para servidor nenhum.
         </p>
 

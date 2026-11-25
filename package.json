@@ -1,5 +1,5 @@
 {
-  "name": "universal-file-converter",
+  "name": "omnithings",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -10,14 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mediabunny/mp3-encoder": "^1.66.4",
     "docx": "^9.8.1",
     "js-yaml": "^5.4.3",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.2",
     "lucide-react": "^1.52.0",
     "marked": "^18.1.0",
+    "mediabunny": "^1.66.4",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^3.11.174",
+    "qrcode-generator": "^2.0.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "xlsx": "^0.18.5"
