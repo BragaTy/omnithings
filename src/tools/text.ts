@@ -220,3 +220,160 @@ export async function shaHex(algorithm: 'SHA-1' | 'SHA-256' | 'SHA-512', input: 
   const buf = await crypto.subtle.digest(algorithm, new TextEncoder().encode(input));
   return Array.from(new Uint8Array(buf), b => b.toString(16).padStart(2, '0')).join('');
 }
+
+
+// ----------------------------------------------------------------- sort, reverse, split, cut
+export function sortLines(text: string, opts: { desc?: boolean; unique?: boolean; ignoreCase?: boolean; removeEmpty?: boolean; numeric?: boolean }): string {
+  let lines = text.split(/\r?\n/);
+  if (opts.removeEmpty) lines = lines.filter(l => l.trim());
+  if (opts.unique) {
+    const seen = new Set<string>();
+    lines = lines.filter(l => {
+      const k = opts.ignoreCase ? l.toLocaleLowerCase('pt-BR') : l;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+  const collator = new Intl.Collator('pt-BR', { sensitivity: opts.ignoreCase ? 'base' : 'variant', numeric: !!opts.numeric });
+  lines.sort(collator.compare);
+  if (opts.desc) lines.reverse();
+  return lines.join('\n');
+}
+
+export function reverseText(text: string, mode: 'chars' | 'words' | 'lines'): string {
+  if (mode === 'lines') return text.split(/\r?\n/).reverse().join('\n');
+  if (mode === 'words') return text.split(/\r?\n/).map(l => l.split(/(\s+)/).reverse().join('')).join('\n');
+  // Intl.Segmenter keeps emoji and accented letters intact
+  const seg = typeof Intl !== 'undefined' && 'Segmenter' in Intl
+    ? Array.from(new (Intl as any).Segmenter('pt-BR', { granularity: 'grapheme' }).segment(text), (s: any) => s.segment as string)
+    : Array.from(text);
+  return seg.reverse().join('');
+}
+
+export function splitText(text: string, delimiter: string, trim = true): string[] {
+  if (!delimiter) return [text];
+  const sep = delimiter === '\\n' ? '\n' : delimiter === '\\t' ? '\t' : delimiter;
+  return text.split(sep).map(s => (trim ? s.trim() : s)).filter(s => s !== '');
+}
+
+export function truncateText(text: string, max: number, by: 'chars' | 'words', ellipsis = true): string {
+  const n = Math.max(0, Math.floor(max));
+  if (by === 'words') {
+    const words = text.trim().split(/\s+/);
+    return words.length <= n ? text.trim() : words.slice(0, n).join(' ') + (ellipsis ? '…' : '');
+  }
+  const chars = Array.from(text);
+  return chars.length <= n ? text : chars.slice(0, n).join('').trimEnd() + (ellipsis ? '…' : '');
+}
+
+export function joinLines(text: string, separator: string): string {
+  return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean).join(separator);
+}
+
+export function textToHtml(text: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return text
+    .replace(/\r\n?/g, '\n')
+    .split(/\n\s*\n/)
+    .filter(p => p.trim())
+    .map(p => `<p>${esc(p.trim()).replace(/\n/g, '<br>\n')}</p>`)
+    .join('\n');
+}
+
+// ----------------------------------------------------------------- word frequency
+const STOPWORDS = new Set(['a', 'o', 'as', 'os', 'e', 'de', 'da', 'do', 'das', 'dos', 'em', 'no', 'na', 'nos', 'nas', 'um', 'uma', 'uns', 'umas', 'para', 'por', 'com', 'que', 'se', 'ao', 'aos', 'à', 'às', 'é', 'ou', 'mas', 'como', 'mais', 'não', 'sem', 'seu', 'sua', 'seus', 'suas', 'ele', 'ela', 'eles', 'elas', 'eu', 'você', 'me', 'te', 'lhe', 'isso', 'isto', 'esse', 'essa', 'este', 'esta', 'pelo', 'pela', 'foi', 'ser', 'são', 'há', 'já', 'the', 'of', 'and', 'to', 'in', 'is', 'it']);
+
+export function wordFrequency(text: string, ignoreStopwords = true): { word: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const raw of text.toLocaleLowerCase('pt-BR').match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) || []) {
+    if (ignoreStopwords && STOPWORDS.has(raw)) continue;
+    counts.set(raw, (counts.get(raw) || 0) + 1);
+  }
+  return Array.from(counts, ([word, count]) => ({ word, count }))
+    .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word, 'pt-BR'));
+}
+
+// ----------------------------------------------------------------- number to words (pt-BR)
+const UNITS = ['zero', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove', 'dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+const UNITS_F = ['zero', 'uma', 'duas'];
+const TENS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+const HUNDREDS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+const SCALE_ONE = ['', 'mil', 'milhão', 'bilhão', 'trilhão', 'quatrilhão'];
+const SCALE_MANY = ['', 'mil', 'milhões', 'bilhões', 'trilhões', 'quatrilhões'];
+
+function groupWords(n: number, feminine = false): string {
+  if (n === 100) return 'cem';
+  const h = Math.floor(n / 100);
+  const r = n % 100;
+  const parts: string[] = [];
+  if (h) parts.push(feminine && h >= 2 ? HUNDREDS[h].replace(/os$/, 'as') : HUNDREDS[h]);
+  if (r) {
+    const unit = (u: number) => (feminine && u <= 2 ? UNITS_F[u] : UNITS[u]);
+    if (r < 20) parts.push(unit(r));
+    else {
+      const t = Math.floor(r / 10);
+      const u = r % 10;
+      parts.push(u ? `${TENS[t]} e ${unit(u)}` : TENS[t]);
+    }
+  }
+  return parts.join(' e ');
+}
+
+export function numberToWords(value: number, feminine = false): string {
+  if (!isFinite(value)) return '';
+  let n = Math.floor(Math.abs(value));
+  if (n === 0) return 'zero';
+  if (n >= 1e18) throw new Error('Número grande demais.');
+  const groups: number[] = [];
+  while (n > 0) {
+    groups.push(n % 1000);
+    n = Math.floor(n / 1000);
+  }
+  const parts: { text: string; value: number }[] = [];
+  for (let i = groups.length - 1; i >= 0; i--) {
+    const g = groups[i];
+    if (!g) continue;
+    // feminine only applies to units/thousands ("duas mil pessoas"), not to millions
+    const fem = feminine && i <= 1;
+    let text: string;
+    if (i === 0) text = groupWords(g, fem);
+    else if (i === 1) text = g === 1 ? 'mil' : `${groupWords(g, fem)} mil`;
+    else text = g === 1 ? `um ${SCALE_ONE[i]}` : `${groupWords(g)} ${SCALE_MANY[i]}`;
+    parts.push({ text, value: g });
+  }
+  let out = parts[0].text;
+  for (let i = 1; i < parts.length; i++) {
+    const isLast = i === parts.length - 1;
+    const p = parts[i];
+    out += isLast && (p.value < 100 || p.value % 100 === 0) ? ` e ${p.text}` : ` ${p.text}`;
+  }
+  return (value < 0 ? 'menos ' : '') + out;
+}
+
+export function moneyToWords(value: number): string {
+  if (!isFinite(value)) return '';
+  const abs = Math.abs(value);
+  let reais = Math.floor(abs);
+  let cents = Math.round((abs - reais) * 100);
+  if (cents === 100) { reais += 1; cents = 0; }
+  const parts: string[] = [];
+  if (reais > 0) {
+    const exactMillions = reais >= 1e6 && reais % 1e6 === 0;
+    parts.push(`${numberToWords(reais)}${exactMillions ? ' de' : ''} ${reais === 1 ? 'real' : 'reais'}`);
+  }
+  if (cents > 0) parts.push(`${numberToWords(cents)} ${cents === 1 ? 'centavo' : 'centavos'}`);
+  if (!parts.length) return 'zero real';
+  return (value < 0 ? 'menos ' : '') + parts.join(' e ');
+}
+
+// ----------------------------------------------------------------- symbols to copy
+export const SYMBOL_GROUPS: { name: string; symbols: string }[] = [
+  { name: 'Setas', symbols: '← → ↑ ↓ ↔ ↕ ⇐ ⇒ ⇑ ⇓ ⇔ ➜ ➔ ➤ ↩ ↪ ⤴ ⤵ ↻ ↺' },
+  { name: 'Marcas', symbols: '✓ ✔ ✗ ✘ ☐ ☑ ☒ ★ ☆ ✦ ✧ ● ○ ◆ ◇ ■ □ ▲ △ ▼ ▽ • ◦ ※' },
+  { name: 'Matemática', symbols: '± × ÷ ≠ ≈ ≤ ≥ ∞ √ ∑ ∏ ∫ ∂ ∆ π µ ° ‰ ½ ⅓ ¼ ¾ ² ³ ¹ ∈ ∉ ∩ ∪ ⊂ ∀ ∃' },
+  { name: 'Moedas', symbols: 'R$ $ € £ ¥ ¢ ₿ ₹ ₩ ₽ ₺ ₱' },
+  { name: 'Pontuação e texto', symbols: '« » “ ” ‘ ’ — – … ¶ § † ‡ © ® ™ ℠ № ª º ¡ ¿' },
+  { name: 'Corações e diversos', symbols: '♥ ♡ ❤ ❥ ☀ ☁ ☂ ☃ ★ ☎ ✉ ✂ ✏ ⚡ ☕ ♫ ♪ ♬ ☯ ☮ ⚠ ♻ ⌛ ⏰' },
+  { name: 'Grego', symbols: 'α β γ δ ε ζ η θ λ μ ξ σ τ φ χ ψ ω Γ Δ Θ Λ Σ Φ Ψ Ω' },
+];

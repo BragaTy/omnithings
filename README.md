@@ -22,7 +22,12 @@
 - **Finanças**: importe extratos (CSV, OFX, Excel) e faturas de cartão dos bancos brasileiros e veja gastos por categoria, metas mensais, entradas × saídas por mês e as contas fixas e assinaturas detectadas automaticamente. Os dados ficam só no `localStorage` do navegador.
 - **Converter**: imagens, documentos (DOCX → PDF mantém as imagens), planilhas, dados, **vídeo** (MP4, WebM, MKV, MOV) e **áudio** (MP3, M4A, OGG, WAV) via WebCodecs.
 - **Ferramentas PDF** e **Vídeo e áudio**: juntar, dividir, comprimir, cortar, gravar tela etc.
-- **Utilitários**: gerador de senha, CPF/CNPJ (gerar e validar), QR Code Pix, gerador de nicks, links de WhatsApp/Telegram, letras diferentes, contador de texto, remover HTML, cifra de César, hash MD5/SHA, unidades de medida e bases numéricas.
+- **Utilitários** (31 ferramentas):
+  - *Documentos e dados de teste*: gerar e validar CPF, CNPJ, RG, CNH, PIS/PASEP, RENAVAM, título de eleitor, inscrição estadual (SP, RJ, PR, RS), CEP e placa; pessoa e empresa fictícias; cartão de crédito de teste (Luhn); conta bancária de teste (BB, Itaú, Bradesco).
+  - *Gerar*: senha, QR Code Pix, nicks, links de WhatsApp/Telegram, Lorem Ipsum, sorteador.
+  - *Texto*: letras diferentes, símbolos, contador e maiúsculas, número por extenso, ordem alfabética, ocorrência de palavras, dividir/juntar/cortar, inverter, remover HTML, texto para HTML, cifra de César, hash MD5/SHA.
+  - *Matemática*: porcentagem, regra de três, datas e dias úteis (com feriados nacionais), áreas, MDC/MMC/fatoração, números romanos.
+  - *Converter*: unidades de medida e bases numéricas.
 
 ---
 

@@ -1,27 +1,54 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import qrcode from 'qrcode-generator';
-import { Search, Copy, Check, RefreshCw, Download } from 'lucide-react';
-import { generateCpf, validateCpf, generateCnpj, validateCnpj } from '../../tools/documents';
+import { Search, RefreshCw, Download } from 'lucide-react';
 import { buildPixPayload, PixKeyType } from '../../tools/pix';
 import {
   generatePassword, passwordStrength, caesar, fancyVariants, generateNicks, stripHtml,
   textStats, toTitleCase, removeAccents, md5, shaHex,
 } from '../../tools/text';
 import { UNIT_GROUPS, convertUnit, formatNumber, convertBase } from '../../tools/units';
+import { inputCls, labelCls, primaryBtn, CopyButton, OutputRow, Toggle } from './shared';
+import { DocumentsTool, CardTool, BankTool, PersonTool, CompanyTool, LoremTool, DrawTool } from './DevTools';
+import { SortTool, ReverseTool, SplitCutTool, TextToHtmlTool, FrequencyTool, ExtensoTool, SymbolsTool } from './TextTools';
+import { PercentTool, RuleOfThreeTool, RomanTool, NumberTheoryTool, AreaTool, DatesTool } from './MathTools';
 
-type ToolId = 'password' | 'cpf' | 'pix' | 'hash' | 'caesar' | 'links' | 'fancy' | 'nicks' | 'html' | 'text' | 'units' | 'bases';
+type ToolId =
+  | 'documents' | 'person' | 'company' | 'card' | 'bank'
+  | 'password' | 'pix' | 'nicks' | 'links' | 'lorem' | 'draw'
+  | 'fancy' | 'text' | 'sort' | 'reverse' | 'split' | 'extenso' | 'frequency' | 'html' | 'text2html' | 'symbols' | 'caesar' | 'hash'
+  | 'percent' | 'rule3' | 'roman' | 'numbers' | 'area' | 'dates'
+  | 'units' | 'bases';
 
-const TOOLS: { id: ToolId; group: string; name: string; description: string }[] = [
+const TOOLS: { id: ToolId; group: string; name: string; description: string; keywords?: string }[] = [
+  { id: 'documents', group: 'Documentos e dados de teste', name: 'Gerar e validar documentos', description: 'CPF, CNPJ, RG, CNH, PIS, RENAVAM, título, IE, CEP, placa', keywords: 'cpf cnpj rg cnh pis pasep nit renavam titulo eleitor inscricao estadual cep placa validador gerador' },
+  { id: 'person', group: 'Documentos e dados de teste', name: 'Pessoa fictícia', description: 'Nome, documentos, endereço e contato para testes', keywords: 'gerador de pessoas nomes' },
+  { id: 'company', group: 'Documentos e dados de teste', name: 'Empresa fictícia', description: 'Razão social, CNPJ, IE e endereço para testes', keywords: 'gerador de empresas' },
+  { id: 'card', group: 'Documentos e dados de teste', name: 'Cartão de crédito de teste', description: 'Números para testar formulários e validar (Luhn)', keywords: 'gerador validador cartao credito visa mastercard elo' },
+  { id: 'bank', group: 'Documentos e dados de teste', name: 'Conta bancária de teste', description: 'BB, Itaú e Bradesco com dígito correto', keywords: 'gerador validador conta agencia banco' },
   { id: 'password', group: 'Gerar', name: 'Gerador de senha', description: 'Senhas fortes e aleatórias' },
-  { id: 'cpf', group: 'Gerar', name: 'CPF e CNPJ', description: 'Gerar números de teste e validar' },
   { id: 'pix', group: 'Gerar', name: 'QR Code Pix', description: 'Cobrança Pix com QR e copia e cola' },
   { id: 'nicks', group: 'Gerar', name: 'Gerador de nicks', description: 'Nomes para jogos e redes' },
   { id: 'links', group: 'Gerar', name: 'Link de WhatsApp e Telegram', description: 'Link direto para conversa' },
+  { id: 'lorem', group: 'Gerar', name: 'Lorem Ipsum', description: 'Texto de preenchimento' },
+  { id: 'draw', group: 'Gerar', name: 'Sorteador', description: 'Números aleatórios ou nomes de uma lista', keywords: 'numeros aleatorios sorteio' },
   { id: 'fancy', group: 'Texto', name: 'Letras diferentes', description: 'Estilos de texto para copiar' },
-  { id: 'text', group: 'Texto', name: 'Contador e formatação', description: 'Palavras, caracteres, maiúsculas' },
+  { id: 'symbols', group: 'Texto', name: 'Símbolos para copiar', description: 'Setas, marcas, matemática, moedas…' },
+  { id: 'text', group: 'Texto', name: 'Contador e maiúsculas', description: 'Caracteres, palavras, maiúsculas, sem acentos', keywords: 'contador de caracteres remover acentos' },
+  { id: 'extenso', group: 'Texto', name: 'Número por extenso', description: 'Números e valores em reais por extenso' },
+  { id: 'sort', group: 'Texto', name: 'Ordem alfabética', description: 'Ordenar linhas e remover repetidas' },
+  { id: 'frequency', group: 'Texto', name: 'Ocorrência de palavras', description: 'Quais palavras mais aparecem' },
+  { id: 'split', group: 'Texto', name: 'Dividir, juntar e cortar', description: 'Separar por vírgula, juntar linhas, limitar tamanho', keywords: 'dividir string cortar textos remover quebra de linha \\n' },
+  { id: 'reverse', group: 'Texto', name: 'Inverter texto', description: 'Letras, palavras ou linhas ao contrário' },
   { id: 'html', group: 'Texto', name: 'Remover HTML', description: 'Extrai o texto puro de um HTML' },
+  { id: 'text2html', group: 'Texto', name: 'Texto para HTML', description: 'Parágrafos e quebras em HTML' },
   { id: 'caesar', group: 'Texto', name: 'Cifra de César', description: 'Codificar e decodificar' },
   { id: 'hash', group: 'Texto', name: 'Hash MD5 e SHA', description: 'MD5, SHA-1, SHA-256, SHA-512' },
+  { id: 'percent', group: 'Matemática', name: 'Porcentagem', description: 'X% de Y, variação, aumento e desconto' },
+  { id: 'rule3', group: 'Matemática', name: 'Regra de três', description: 'Direta e inversa' },
+  { id: 'dates', group: 'Matemática', name: 'Calcular datas', description: 'Dias entre datas, dias úteis, somar dias', keywords: 'contador de dias somar subtrair' },
+  { id: 'area', group: 'Matemática', name: 'Área de figuras', description: 'Círculo, triângulo, trapézio, polígonos…' },
+  { id: 'numbers', group: 'Matemática', name: 'MDC, MMC e fatoração', description: 'Também resto da divisão', keywords: 'mdc mmc fatorar primos resto divisao' },
+  { id: 'roman', group: 'Matemática', name: 'Números romanos', description: 'Converter nos dois sentidos' },
   { id: 'units', group: 'Converter', name: 'Unidades de medida', description: 'Comprimento, massa, temperatura…' },
   { id: 'bases', group: 'Converter', name: 'Bases numéricas', description: 'Binário, octal, decimal, hexa' },
 ];
@@ -35,7 +62,7 @@ export const ToolsView: React.FC = () => {
       const saved = localStorage.getItem(TOOL_KEY) as ToolId | null;
       if (saved && TOOLS.some(t => t.id === saved)) return saved;
     } catch { /* ignore */ }
-    return 'password';
+    return 'documents';
   });
 
   const select = (id: ToolId) => {
@@ -46,7 +73,7 @@ export const ToolsView: React.FC = () => {
 
   const filtered = useMemo(() => {
     const q = removeAccents(query.toLowerCase().trim());
-    return TOOLS.filter(t => !q || removeAccents(`${t.name} ${t.description}`.toLowerCase()).includes(q));
+    return TOOLS.filter(t => !q || removeAccents(`${t.name} ${t.description} ${t.keywords || ''}`.toLowerCase()).includes(q));
   }, [query]);
   const groups = Array.from(new Set(filtered.map(t => t.group)));
   const tool = TOOLS.find(t => t.id === active)!;
@@ -99,8 +126,27 @@ export const ToolsView: React.FC = () => {
           <h2 id="tool-title" className="text-2xl font-bold text-slate-50">{tool.name}</h2>
           <p className="mt-1 text-sm text-slate-400">{tool.description}</p>
           <div className="mt-6">
+            {active === 'documents' && <DocumentsTool />}
+            {active === 'person' && <PersonTool />}
+            {active === 'company' && <CompanyTool />}
+            {active === 'card' && <CardTool />}
+            {active === 'bank' && <BankTool />}
+            {active === 'lorem' && <LoremTool />}
+            {active === 'draw' && <DrawTool />}
+            {active === 'symbols' && <SymbolsTool />}
+            {active === 'extenso' && <ExtensoTool />}
+            {active === 'sort' && <SortTool />}
+            {active === 'frequency' && <FrequencyTool />}
+            {active === 'split' && <SplitCutTool />}
+            {active === 'reverse' && <ReverseTool />}
+            {active === 'text2html' && <TextToHtmlTool />}
+            {active === 'percent' && <PercentTool />}
+            {active === 'rule3' && <RuleOfThreeTool />}
+            {active === 'dates' && <DatesTool />}
+            {active === 'area' && <AreaTool />}
+            {active === 'numbers' && <NumberTheoryTool />}
+            {active === 'roman' && <RomanTool />}
             {active === 'password' && <PasswordTool />}
-            {active === 'cpf' && <CpfTool />}
             {active === 'pix' && <PixTool />}
             {active === 'nicks' && <NickTool />}
             {active === 'links' && <LinksTool />}
@@ -117,66 +163,6 @@ export const ToolsView: React.FC = () => {
     </div>
   );
 };
-
-// ---------------------------------------------------------------------------
-// Shared pieces
-
-const inputCls = 'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-100 placeholder:text-slate-600';
-const labelCls = 'block text-sm font-medium text-slate-300 mb-1.5';
-const primaryBtn = 'inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500';
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    ta.remove();
-    return ok;
-  }
-}
-
-const CopyButton: React.FC<{ value: string; label?: string; compact?: boolean }> = ({ value, label = 'Copiar', compact }) => {
-  const [done, setDone] = useState(false);
-  return (
-    <button
-      type="button"
-      disabled={!value}
-      onClick={async () => {
-        if (await copyText(value)) {
-          setDone(true);
-          setTimeout(() => setDone(false), 1500);
-        }
-      }}
-      aria-label={compact ? `${label}: ${value}` : undefined}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-700 text-sm text-slate-200 hover:bg-slate-800 disabled:opacity-40 ${compact ? 'p-2' : 'px-3 py-2'}`}
-    >
-      {done ? <Check className="w-4 h-4 text-emerald-300" aria-hidden="true" /> : <Copy className="w-4 h-4" aria-hidden="true" />}
-      {!compact && (done ? 'Copiado' : label)}
-    </button>
-  );
-};
-
-const OutputRow: React.FC<{ label?: string; value: string; mono?: boolean }> = ({ label, value, mono }) => (
-  <div className="flex items-center gap-2 border-b border-slate-800 py-2.5 last:border-0">
-    <div className="min-w-0 flex-1">
-      {label && <p className="text-xs text-slate-400">{label}</p>}
-      <p className={`break-all text-slate-100 ${mono ? 'font-mono text-sm' : ''}`}>{value || '—'}</p>
-    </div>
-    <CopyButton value={value} compact />
-  </div>
-);
-
-const Toggle: React.FC<{ checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode }> = ({ checked, onChange, children }) => (
-  <label className="inline-flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-    <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="h-4 w-4 accent-indigo-500" />
-    {children}
-  </label>
-);
 
 // ---------------------------------------------------------------------------
 // Tools
@@ -213,48 +199,6 @@ const PasswordTool: React.FC = () => {
         <Toggle checked={opts.numbers} onChange={set('numbers')}>Números</Toggle>
         <Toggle checked={opts.symbols} onChange={set('symbols')}>Símbolos</Toggle>
         <Toggle checked={opts.avoidAmbiguous} onChange={set('avoidAmbiguous')}>Evitar parecidos (0/O, l/1)</Toggle>
-      </div>
-    </div>
-  );
-};
-
-const CpfTool: React.FC = () => {
-  const [kind, setKind] = useState<'cpf' | 'cnpj'>('cpf');
-  const [formatted, setFormatted] = useState(true);
-  const [list, setList] = useState<string[]>([]);
-  const [check, setCheck] = useState('');
-  const gen = () => setList(Array.from({ length: 5 }, () => (kind === 'cpf' ? generateCpf(formatted) : generateCnpj(formatted))));
-  useEffect(gen, [kind, formatted]); // eslint-disable-line react-hooks/exhaustive-deps
-  const digits = check.replace(/\D/g, '');
-  const checkKind = digits.length > 11 ? 'CNPJ' : 'CPF';
-  const valid = digits.length === 14 ? validateCnpj(check) : validateCpf(check);
-
-  return (
-    <div className="space-y-8">
-      <div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="inline-flex rounded-lg border border-slate-700 p-0.5" role="group" aria-label="Tipo de documento">
-            {(['cpf', 'cnpj'] as const).map(k => (
-              <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={kind === k}
-                className={`rounded-md px-4 py-1.5 text-sm font-medium ${kind === k ? 'bg-slate-800 text-slate-50' : 'text-slate-400 hover:text-slate-100'}`}>
-                {k.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <Toggle checked={formatted} onChange={setFormatted}>Com pontuação</Toggle>
-          <button type="button" onClick={gen} className={primaryBtn}><RefreshCw className="w-4 h-4" aria-hidden="true" />Gerar outros</button>
-        </div>
-        <div className="mt-4">{list.map(v => <OutputRow key={v} value={v} mono />)}</div>
-        <p className="mt-3 text-xs text-slate-500">Números válidos matematicamente, para testar sistemas. Não pertencem a ninguém.</p>
-      </div>
-      <div>
-        <label htmlFor="doc-check" className={labelCls}>Validar CPF ou CNPJ</label>
-        <input id="doc-check" value={check} onChange={e => setCheck(e.target.value)} placeholder="000.000.000-00" className={inputCls} inputMode="numeric" />
-        {digits.length >= 11 && (
-          <p className={`mt-2 text-sm ${valid ? 'text-emerald-300' : 'text-rose-300'}`} role="status">
-            {valid ? `✓ ${checkKind} válido` : `✕ ${checkKind} inválido (dígitos verificadores não conferem)`}
-          </p>
-        )}
       </div>
     </div>
   );
